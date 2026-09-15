@@ -14,6 +14,10 @@ pub struct OpenDoc {
     pub document: PdfDocument<'static>,
     pub path: String,
     pub dirty: bool,
+    /// Byte snapshots taken before each mutation (newest last).
+    pub undo: Vec<Vec<u8>>,
+    /// Snapshots popped by undo, available again via redo (newest last).
+    pub redo: Vec<Vec<u8>>,
 }
 
 pub struct AppState {

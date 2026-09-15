@@ -14,9 +14,11 @@ import {
   IconNote,
   IconOpen,
   IconPlus,
+  IconRedo,
   IconRotateLeft,
   IconRotateRight,
   IconSave,
+  IconUndo,
   IconSign,
   IconSplit,
   IconStamp,
@@ -48,6 +50,8 @@ interface ToolbarProps {
   onSign: () => void;
   onSecurity: () => void;
   onForm: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onRotate: (degrees: number) => void;
   onDelete: () => void;
   onZoom: (zoom: number) => void;
@@ -77,6 +81,8 @@ export function Toolbar({
   onSign,
   onSecurity,
   onForm,
+  onUndo,
+  onRedo,
   onRotate,
   onDelete,
   onZoom,
@@ -120,6 +126,15 @@ export function Toolbar({
       </button>
       <button className="btn" onClick={onSaveAs} disabled={!doc || busy} title={t('toolbar.saveAs')}>
         {t('toolbar.saveAs')}
+      </button>
+
+      <div className="toolbar-sep" />
+
+      <button className="btn btn-icon" onClick={onUndo} disabled={!doc || busy} title={t('toolbar.undo')}>
+        <IconUndo />
+      </button>
+      <button className="btn btn-icon" onClick={onRedo} disabled={!doc || busy} title={t('toolbar.redo')}>
+        <IconRedo />
       </button>
 
       <div className="toolbar-sep" />

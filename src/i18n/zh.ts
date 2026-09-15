@@ -21,6 +21,8 @@ export const zh: Strings = {
     exportImages: '导出图片',
     imagesToPdf: '图片转 PDF',
     sign: '签名',
+    undo: '撤销',
+    redo: '重做',
   },
 
   empty: {

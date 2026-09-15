@@ -85,6 +85,20 @@ export const IconSplit = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+export const IconUndo = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3 7.5h6.5a3.5 3.5 0 0 1 0 7H6" />
+    <path d="M5.5 4.5 2.5 7.5l3 3" />
+  </svg>
+);
+
+export const IconRedo = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M13 7.5H6.5a3.5 3.5 0 0 0 0 7H10" />
+    <path d="M10.5 4.5l3 3-3 3" />
+  </svg>
+);
+
 export const IconForm = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <rect x="2.5" y="3" width="11" height="10" rx="1.2" />

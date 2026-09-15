@@ -57,6 +57,8 @@ pub async fn open_document(
         document,
         path,
         dirty: false,
+        undo: Vec::new(),
+        redo: Vec::new(),
     });
 
     Ok(info)
@@ -67,6 +69,60 @@ pub async fn close_document(state: State<'_, AppState>) -> CmdResult<()> {
     let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
     *guard = None;
     Ok(())
+}
+
+/* ── Undo / redo ─────────────────────────────────────────────────── */
+
+/// Snapshots the document before a mutation so it can be undone later.
+/// Keeps the history bounded — a 40-step buffer of a 20 MB PDF is enough.
+fn push_undo(doc: &mut OpenDoc) {
+    if let Ok(bytes) = doc.document.save_to_bytes() {
+        doc.undo.push(bytes);
+        if doc.undo.len() > 40 {
+            doc.undo.remove(0);
+        }
+        doc.redo.clear();
+    }
+}
+
+#[tauri::command]
+pub async fn undo(app: AppHandle, state: State<'_, AppState>) -> CmdResult<DocumentInfo> {
+    let pdfium = init_pdfium(&app)?;
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    let Some(previous) = doc.undo.pop() else {
+        return Err("Nothing to undo".to_string());
+    };
+    if let Ok(current) = doc.document.save_to_bytes() {
+        doc.redo.push(current);
+    }
+
+    doc.document = pdfium
+        .load_pdf_from_byte_vec(previous, None)
+        .map_err(|e| e.to_string())?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+#[tauri::command]
+pub async fn redo(app: AppHandle, state: State<'_, AppState>) -> CmdResult<DocumentInfo> {
+    let pdfium = init_pdfium(&app)?;
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    let Some(next) = doc.redo.pop() else {
+        return Err("Nothing to redo".to_string());
+    };
+    if let Ok(current) = doc.document.save_to_bytes() {
+        doc.undo.push(current);
+    }
+
+    doc.document = pdfium
+        .load_pdf_from_byte_vec(next, None)
+        .map_err(|e| e.to_string())?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
 }
 
 /* ── Rendering ───────────────────────────────────────────────────── */
@@ -96,6 +152,7 @@ pub async fn delete_pages(state: State<'_, AppState>, indices: Vec<i32>) -> CmdR
     if indices.len() as i32 >= total {
         return Err("Cannot delete every page".to_string());
     }
+    push_undo(doc);
 
     let mut sorted = indices;
     sorted.sort_unstable();
@@ -130,6 +187,7 @@ pub async fn rotate_pages(
     if indices.is_empty() {
         return Err("No pages selected".to_string());
     }
+    push_undo(doc);
 
     let mut sorted = indices;
     sorted.sort_unstable();
@@ -167,6 +225,7 @@ pub async fn move_page(
     if from == to {
         return doc_info(&doc.document, &doc.path, doc.dirty);
     }
+    push_undo(doc);
 
     let mut order: Vec<i32> = (0..total).collect();
     let moved = order.remove(from as usize);
@@ -412,6 +471,7 @@ pub async fn stamp_document(
     let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
     let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
 
+    push_undo(doc);
     crate::pdf::apply_stamp(&mut doc.document, kind, &text, font_size, margin, opacity)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
@@ -437,6 +497,7 @@ pub async fn add_markup(
         *color.get(2).unwrap_or(&59),
     );
 
+    push_undo(doc);
     crate::pdf::add_markup(&mut doc.document, kind, rect, c, opacity)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
@@ -461,6 +522,7 @@ pub async fn add_note(
         *color.get(2).unwrap_or(&0),
     );
 
+    push_undo(doc);
     crate::pdf::add_note(&mut doc.document, page, x, y, &text, c)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
@@ -479,6 +541,7 @@ pub async fn add_signature(
     let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
     let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
 
+    push_undo(doc);
     crate::pdf::add_signature(&mut doc.document, page, x, y, width, &image_path)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
@@ -538,6 +601,7 @@ pub async fn set_form_values(
     let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
     let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
 
+    push_undo(doc);
     crate::pdf::set_form_values(&mut doc.document, &values)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)

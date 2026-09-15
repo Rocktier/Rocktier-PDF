@@ -19,6 +19,8 @@ export const en = {
     exportImages: 'To images',
     imagesToPdf: 'Images to PDF',
     sign: 'Sign',
+    undo: 'Undo',
+    redo: 'Redo',
   },
 
   empty: {

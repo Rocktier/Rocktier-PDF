@@ -14,12 +14,15 @@ import { StatusBar } from './components/StatusBar';
 import { ThumbnailRail } from './components/ThumbnailRail';
 import { Toolbar } from './components/Toolbar';
 import { usePdf } from './hooks/usePdf';
-import { useT } from './i18n';
+import { useI18n, useT } from './i18n';
 import {
+  buildMenu,
   copyText,
   exportPageImages,
   fileStem,
   imagesToPdf,
+  onMenuAction,
+  openUrl,
   pageText,
   pickDirectory,
   pickImages,
@@ -39,6 +42,7 @@ const THEME_KEY = 'rocktier-pdf-editor.theme';
 
 export function App() {
   const t = useT();
+  const { lang } = useI18n();
   const pdf = usePdf();
 
   const [theme, setTheme] = useState<Theme>(() => readTheme());
@@ -104,6 +108,62 @@ export function App() {
     };
   }, [pdf.openPath]);
 
+  /* ── Native menu ────────────────────────────────────────────── */
+  useEffect(() => {
+    void buildMenu(lang);
+  }, [lang]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void onMenuAction((id) => {
+      switch (id) {
+        case 'open':
+          void openFile();
+          break;
+        case 'save':
+          void save();
+          break;
+        case 'save-as':
+          void saveAs();
+          break;
+        case 'undo':
+          void pdf.stepHistory('undo');
+          break;
+        case 'redo':
+          void pdf.stepHistory('redo');
+          break;
+        case 'find':
+          if (pdf.doc) setFindOpen(true);
+          break;
+        case 'actual-size':
+          setZoom(1);
+          break;
+        case 'toggle-theme':
+          setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+          break;
+        case 'website':
+          void openUrl('https://rocktier.com/');
+          break;
+        case 'feedback':
+          void openUrl('mailto:hello@rocktier.com');
+          break;
+        default:
+          break;
+      }
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdf.doc, pdf.stepHistory, lang]);
+
   /* ── Keyboard shortcuts ─────────────────────────────────────── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -117,6 +177,9 @@ export function App() {
       } else if (mod && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         if (pdf.doc) setFindOpen(true);
+      } else if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        void pdf.stepHistory(e.shiftKey ? 'redo' : 'undo');
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && pdf.selected.length > 0) {
         e.preventDefault();
         void removeSelected();
@@ -125,7 +188,7 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf.selected, pdf.doc]);
+  }, [pdf.selected, pdf.doc, pdf.stepHistory]);
 
   /* ── Find ───────────────────────────────────────────────────── */
   useEffect(() => {
@@ -409,6 +472,8 @@ export function App() {
         onSign={chooseSignature}
         onSecurity={() => setDialog('security')}
         onForm={() => setDialog('form')}
+        onUndo={() => void pdf.stepHistory('undo')}
+        onRedo={() => void pdf.stepHistory('redo')}
         onRotate={rotateSelected}
         onDelete={removeSelected}
         onZoom={setZoom}

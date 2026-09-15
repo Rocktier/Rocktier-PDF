@@ -13,6 +13,8 @@ import {
   addMarkup,
   addNote,
   addSignature,
+  redo as redoDocument,
+  undo as undoDocument,
 } from '../services/engine';
 import { clearRenderCache } from '../services/renderCache';
 import { fileStem } from '../services/engine';
@@ -210,6 +212,27 @@ export function usePdf() {
     [applyDoc, run]
   );
 
+  /**
+   * Steps the document history. An empty history is not an error worth
+   * surfacing, so it simply reports `false`.
+   */
+  const stepHistory = useCallback(
+    async (direction: 'undo' | 'redo') => {
+      setBusy(true);
+      setError(null);
+      try {
+        const info = direction === 'undo' ? await undoDocument() : await redoDocument();
+        applyDoc(info);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [applyDoc]
+  );
+
   /** Force every lazily rendered page to redraw (e.g. after a form change). */
   const refresh = useCallback(() => {
     clearRenderCache();
@@ -240,6 +263,7 @@ export function usePdf() {
     markup,
     note,
     signature,
+    stepHistory,
     refresh,
     clearError,
   };

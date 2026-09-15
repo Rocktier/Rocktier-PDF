@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import type {
   DocumentInfo,
@@ -99,6 +100,35 @@ export async function stampDocument(
   opacity: number
 ): Promise<DocumentInfo> {
   return invoke<DocumentInfo>('stamp_document', { kind, text, fontSize, margin, opacity });
+}
+
+/* ── Native menu ────────────────────────────────────────────────── */
+
+/** (Re)builds the native menu for the given UI language. */
+export async function buildMenu(lang: string): Promise<void> {
+  return invoke<void>('build_menu', { lang });
+}
+
+/** Opens a whitelisted external URL (Help menu). */
+export async function openUrl(url: string): Promise<void> {
+  return invoke<void>('open_url', { url });
+}
+
+/** Subscribes to native menu clicks; returns an unsubscribe function. */
+export function onMenuAction(handler: (id: string) => void): Promise<() => void> {
+  return listen<string>('menu-action', (event) => handler(event.payload));
+}
+
+/* ── Undo / redo ────────────────────────────────────────────────── */
+
+/** Step the document history back one mutation. */
+export async function undo(): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('undo');
+}
+
+/** Step the document history forward again. */
+export async function redo(): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('redo');
 }
 
 /* ── AcroForm fields ────────────────────────────────────────────── */
