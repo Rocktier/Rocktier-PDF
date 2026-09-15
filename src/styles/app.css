@@ -27,9 +27,26 @@
 }
 
 .brand-mark {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
+}
+
+/* Letter mark — the app-icon tile: dark in both themes so it matches the Dock
+   icon; the hairline border keeps it from vanishing on the near-black toolbar. */
+.brand-mark .brand-tile {
+  fill: #0a0a0a;
+  stroke: var(--border-hover);
+  stroke-width: 1;
+}
+
+.brand-mark .brand-letters {
+  fill: #ffffff;
+  font-family: var(--font);
+}
+
+.brand-mark .brand-pip {
+  fill: var(--red);
 }
 
 .brand-name {

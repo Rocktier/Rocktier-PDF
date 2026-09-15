@@ -1,5 +1,9 @@
-/** Rocktier wordmark: the diamond mark plus the signature red dot. */
-export function Logo({ size = 22 }: { size?: number }) {
+/**
+ * Rocktier letter mark: the product code (PE) on the app-icon tile, plus the
+ * signature red dot. Keeping the tile dark in both themes means the mark in the
+ * toolbar looks exactly like the icon in the Dock.
+ */
+export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg
       className="brand-mark"
@@ -9,14 +13,20 @@ export function Logo({ size = 22 }: { size?: number }) {
       fill="none"
       aria-hidden="true"
     >
-      <path
-        d="M16 2.5 29.5 16 16 29.5 2.5 16 16 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="M16 8.5 23.5 16 16 23.5 8.5 16 16 8.5Z" fill="currentColor" opacity="0.18" />
-      <circle cx="16" cy="16" r="2.4" fill="var(--red)" />
+      <rect className="brand-tile" x="1" y="1" width="30" height="30" rx="8.5" />
+      <text
+        className="brand-letters"
+        x="15.4"
+        y="16.6"
+        fontSize="15"
+        fontWeight="700"
+        letterSpacing="-1.1"
+        textAnchor="middle"
+        dominantBaseline="central"
+      >
+        PE
+      </text>
+      <circle className="brand-pip" cx="25.6" cy="6.4" r="2.1" />
     </svg>
   );
 }
