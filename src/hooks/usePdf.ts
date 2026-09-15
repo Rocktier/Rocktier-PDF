@@ -210,6 +210,12 @@ export function usePdf() {
     [applyDoc, run]
   );
 
+  /** Force every lazily rendered page to redraw (e.g. after a form change). */
+  const refresh = useCallback(() => {
+    clearRenderCache();
+    setRevision((r) => r + 1);
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -234,6 +240,7 @@ export function usePdf() {
     markup,
     note,
     signature,
+    refresh,
     clearError,
   };
 }

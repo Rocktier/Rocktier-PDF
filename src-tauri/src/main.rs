@@ -3,6 +3,7 @@
 
 mod commands;
 mod pdf;
+mod security;
 mod state;
 
 use state::AppState;
@@ -30,6 +31,10 @@ fn main() {
             commands::add_markup,
             commands::add_note,
             commands::add_signature,
+            commands::remove_password,
+            commands::set_password,
+            commands::list_form_fields,
+            commands::set_form_values,
             commands::reveal_in_finder,
         ])
         .run(tauri::generate_context!())

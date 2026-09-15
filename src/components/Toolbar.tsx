@@ -4,8 +4,10 @@ import {
   IconCopy,
   IconExportImages,
   IconExtract,
+  IconForm,
   IconHighlight,
   IconImagesToPdf,
+  IconLock,
   IconMerge,
   IconMinus,
   IconMoon,
@@ -44,6 +46,8 @@ interface ToolbarProps {
   onExportImages: () => void;
   onImagesToPdf: () => void;
   onSign: () => void;
+  onSecurity: () => void;
+  onForm: () => void;
   onRotate: (degrees: number) => void;
   onDelete: () => void;
   onZoom: (zoom: number) => void;
@@ -71,6 +75,8 @@ export function Toolbar({
   onExportImages,
   onImagesToPdf,
   onSign,
+  onSecurity,
+  onForm,
   onRotate,
   onDelete,
   onZoom,
@@ -200,6 +206,12 @@ export function Toolbar({
         title={t('toolbar.sign')}
       >
         <IconSign />
+      </button>
+      <button className="btn btn-icon" onClick={onSecurity} disabled={!doc || busy} title={t('security.title')}>
+        <IconLock />
+      </button>
+      <button className="btn btn-icon" onClick={onForm} disabled={!doc || busy} title={t('form.title')}>
+        <IconForm />
       </button>
 
       <div className="toolbar-spacer" />

@@ -97,6 +97,31 @@ export const en = {
     done: 'Markup added',
   },
 
+  form: {
+    title: 'Fill form',
+    empty: 'This PDF has no fillable form fields.',
+    loading: 'Reading fields…',
+    apply: 'Apply',
+    cancel: 'Cancel',
+    done: 'Form updated',
+    page: 'Page {n}',
+  },
+
+  security: {
+    title: 'Password protection',
+    mode: 'Action',
+    set: 'Set a password',
+    remove: 'Remove password',
+    password: 'Password',
+    ownerPassword: 'Owner password (optional)',
+    ownerHint: 'Leave blank to reuse the password above.',
+    cancel: 'Cancel',
+    run: 'Save copy',
+    done: 'Saved {name}',
+    needPassword: 'Enter a password',
+    needDoc: 'Save this PDF to disk first',
+  },
+
   password: {
     title: 'Password required',
     hint: 'This PDF is encrypted.',

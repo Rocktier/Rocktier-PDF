@@ -85,6 +85,20 @@ export const IconSplit = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+export const IconForm = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="2.5" y="3" width="11" height="10" rx="1.2" />
+    <path d="M5 6h4M5 8.5h6M5 11h3" />
+  </svg>
+);
+
+export const IconLock = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="3.5" y="7" width="9" height="6.5" rx="1.2" />
+    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+  </svg>
+);
+
 export const IconSign = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M2.5 11.5c2 0 3-1.1 4-3.3s2-4.2 3.1-4.2c1 0 1.2 1 1.5 2.4.3 1.5.7 2.4 1.7 2.4.5 0 .9-.2 1.2-.5" />

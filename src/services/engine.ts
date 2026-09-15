@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import type {
   DocumentInfo,
+  FormFieldInfo,
   MarkupKind,
   MarkupRect,
   PathResult,
@@ -98,6 +99,44 @@ export async function stampDocument(
   opacity: number
 ): Promise<DocumentInfo> {
   return invoke<DocumentInfo>('stamp_document', { kind, text, fontSize, margin, opacity });
+}
+
+/* ── AcroForm fields ────────────────────────────────────────────── */
+
+/** Every fillable form widget in the open document. */
+export async function listFormFields(): Promise<FormFieldInfo[]> {
+  return invoke<FormFieldInfo[]>('list_form_fields');
+}
+
+/** Apply `(field name, value)` pairs to the open document. */
+export async function setFormValues(values: [string, string][]): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('set_form_values', { values });
+}
+
+/* ── Password protection ────────────────────────────────────────── */
+
+/** Write an AES-128 encrypted copy of `input`. */
+export async function setPassword(
+  input: string,
+  output: string,
+  password: string,
+  ownerPassword?: string
+): Promise<PathResult> {
+  return invoke<PathResult>('set_password', {
+    input,
+    output,
+    password,
+    ownerPassword: ownerPassword ?? null,
+  });
+}
+
+/** Write an unencrypted copy of `input`. */
+export async function removePassword(
+  input: string,
+  output: string,
+  password: string
+): Promise<PathResult> {
+  return invoke<PathResult>('remove_password', { input, output, password });
 }
 
 /* ── Import / export images ─────────────────────────────────────── */

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { DropZone } from './components/DropZone';
 import { FindBar } from './components/FindBar';
+import { FormDialog } from './components/FormDialog';
 import { MergeDialog } from './components/MergeDialog';
 import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
 import { PasswordDialog } from './components/PasswordDialog';
+import { SecurityDialog } from './components/SecurityDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
 import { StatusBar } from './components/StatusBar';
@@ -23,13 +25,15 @@ import {
   pickImages,
   pickPdf,
   pickSavePath,
+  removePassword,
   revealInFinder,
   searchDocument,
+  setPassword,
 } from './services/engine';
 import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
-type Dialog = 'merge' | 'split' | 'stamp' | null;
+type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | null;
 
 const THEME_KEY = 'rocktier-pdf-editor.theme';
 
@@ -342,6 +346,27 @@ export function App() {
     [markupTool, notify, pdf, sigPath, t]
   );
 
+  const runSecurity = useCallback(
+    async (mode: 'set' | 'remove', password: string, ownerPassword: string) => {
+      if (!pdf.doc || !pdf.doc.path) {
+        throw new Error(t('security.needDoc'));
+      }
+      const target = await pickSavePath(
+        `${fileStem(pdf.doc.name)}-${mode === 'set' ? 'protected' : 'unlocked'}.pdf`
+      );
+      if (!target) return;
+
+      const result =
+        mode === 'set'
+          ? await setPassword(pdf.doc.path, target, password, ownerPassword)
+          : await removePassword(pdf.doc.path, target, password);
+
+      notify(t('security.done', { name: fileStem(result.path) + '.pdf' }));
+      void revealInFinder(result.path);
+    },
+    [notify, pdf.doc, t]
+  );
+
   const selectPage = useCallback((index: number) => {
     setCurrent(index);
     setJump({ index, token: Date.now() });
@@ -382,6 +407,8 @@ export function App() {
         onExportImages={exportImages}
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
+        onSecurity={() => setDialog('security')}
+        onForm={() => setDialog('form')}
         onRotate={rotateSelected}
         onDelete={removeSelected}
         onZoom={setZoom}
@@ -449,6 +476,18 @@ export function App() {
       ) : null}
       {dialog === 'stamp' && doc ? (
         <StampDialog onClose={() => setDialog(null)} onRun={applyStamp} />
+      ) : null}
+      {dialog === 'security' && doc ? (
+        <SecurityDialog onClose={() => setDialog(null)} onRun={runSecurity} />
+      ) : null}
+      {dialog === 'form' && doc ? (
+        <FormDialog
+          onClose={() => setDialog(null)}
+          onApplied={() => {
+            pdf.refresh();
+            notify(t('form.done'));
+          }}
+        />
       ) : null}
       {noteAt ? <NoteDialog onClose={() => setNoteAt(null)} onRun={applyNote} /> : null}
       {pwPrompt ? (

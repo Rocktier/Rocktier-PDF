@@ -99,6 +99,31 @@ export const zh: Strings = {
     done: '已添加标注',
   },
 
+  form: {
+    title: '填写表单',
+    empty: '该 PDF 没有可填写的表单字段。',
+    loading: '正在读取字段…',
+    apply: '应用',
+    cancel: '取消',
+    done: '表单已更新',
+    page: '第 {n} 页',
+  },
+
+  security: {
+    title: '密码保护',
+    mode: '操作',
+    set: '设置密码',
+    remove: '移除密码',
+    password: '密码',
+    ownerPassword: '所有者密码（可选）',
+    ownerHint: '留空则与上面的密码相同。',
+    cancel: '取消',
+    run: '保存副本',
+    done: '已保存 {name}',
+    needPassword: '请输入密码',
+    needDoc: '请先将该 PDF 保存到磁盘',
+  },
+
   password: {
     title: '需要密码',
     hint: '该 PDF 已加密。',

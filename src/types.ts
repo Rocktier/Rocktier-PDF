@@ -48,6 +48,15 @@ export interface SearchHit {
 
 export type StampKind = 'pageNumbers' | 'watermark';
 
+export interface FormFieldInfo {
+  /** Zero-based page index the widget sits on. */
+  page: number;
+  name: string;
+  /** "text" | "checkbox" | "radio" | "combo" | "list" | "button" | "signature" | "unknown" */
+  kind: string;
+  value: string;
+}
+
 export type MarkupKind = 'highlight' | 'underline' | 'strikeout';
 
 /** Any annotation tool the user can arm: rect marks, notes, and signatures. */

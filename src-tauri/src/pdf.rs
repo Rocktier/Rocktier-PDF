@@ -519,6 +519,107 @@ pub fn add_signature(
     Ok(())
 }
 
+/* ── AcroForm fields ─────────────────────────────────────────────── */
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FormFieldInfo {
+    pub page: i32,
+    pub name: String,
+    /// "text" | "checkbox" | "radio" | "combo" | "list" | "button" | "signature" | "unknown"
+    pub kind: String,
+    pub value: String,
+}
+
+/// Every fillable widget in the document's AcroForm, in page order.
+pub fn list_form_fields(doc: &PdfDocument) -> Result<Vec<FormFieldInfo>, String> {
+    let mut out = Vec::new();
+
+    for page_index in 0..doc.pages().len() {
+        let page = doc.pages().get(page_index).map_err(|e| e.to_string())?;
+        for annotation in page.annotations().iter() {
+            let Some(field) = annotation.as_form_field() else {
+                continue;
+            };
+            let name = field.name().unwrap_or_default();
+            if name.is_empty() {
+                continue;
+            }
+
+            let (kind, value) = match field {
+                PdfFormField::Text(f) => ("text", f.value().unwrap_or_default()),
+                PdfFormField::Checkbox(f) => (
+                    "checkbox",
+                    if f.is_checked().unwrap_or(false) { "true" } else { "false" }.to_string(),
+                ),
+                PdfFormField::RadioButton(f) => (
+                    "radio",
+                    if f.is_checked().unwrap_or(false) { "true" } else { "false" }.to_string(),
+                ),
+                PdfFormField::ComboBox(f) => ("combo", f.value().unwrap_or_default()),
+                PdfFormField::ListBox(f) => ("list", f.value().unwrap_or_default()),
+                PdfFormField::PushButton(_) => ("button", String::new()),
+                PdfFormField::Signature(_) => ("signature", String::new()),
+                _ => ("unknown", String::new()),
+            };
+
+            out.push(FormFieldInfo {
+                page: page_index,
+                name,
+                kind: kind.to_string(),
+                value,
+            });
+        }
+    }
+
+    Ok(out)
+}
+
+/// Applies `(field name, value)` pairs to the document's form widgets.
+///
+/// Text fields receive the raw string; checkboxes and radio buttons treat
+/// "true"/"1" as checked.
+pub fn set_form_values(doc: &mut PdfDocument, values: &[(String, String)]) -> Result<(), String> {
+    if values.is_empty() {
+        return Ok(());
+    }
+
+    for page_index in 0..doc.pages().len() {
+        let mut page = doc.pages_mut().get(page_index).map_err(|e| e.to_string())?;
+        let annotations = page.annotations_mut();
+        let count = annotations.len();
+
+        for index in 0..count {
+            let mut annotation = annotations.get(index).map_err(|e| e.to_string())?;
+            let Some(field) = annotation.as_form_field_mut() else {
+                continue;
+            };
+            let name = field.name().unwrap_or_default();
+            let Some((_, value)) = values.iter().find(|(n, _)| *n == name) else {
+                continue;
+            };
+
+            match field {
+                PdfFormField::Text(f) => {
+                    f.set_value(value).map_err(|e| e.to_string())?;
+                }
+                PdfFormField::Checkbox(f) => {
+                    let on = value.eq_ignore_ascii_case("true") || value == "1";
+                    f.set_checked(on).map_err(|e| e.to_string())?;
+                }
+                PdfFormField::RadioButton(f) => {
+                    if value.eq_ignore_ascii_case("true") {
+                        f.set_checked().map_err(|e| e.to_string())?;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /* ── Import / export images ──────────────────────────────────────── */
 
 /// Renders the given pages to individual PNG files inside `output_dir`.

@@ -11,8 +11,8 @@ use tauri::{AppHandle, State};
 
 use crate::pdf::{
     degrees_of, doc_info, init_pdfium, parse_ranges, render_page as render_page_impl,
-    rotation_of, DocumentInfo, MarkupKind, MarkupRect, PathResult, RenderedPage, SearchHit,
-    SplitMode, StampKind,
+    rotation_of, DocumentInfo, FormFieldInfo, MarkupKind, MarkupRect, PathResult, RenderedPage,
+    SearchHit, SplitMode, StampKind,
 };
 use crate::state::{AppState, OpenDoc};
 
@@ -519,6 +519,54 @@ pub async fn images_to_pdf(
 ) -> CmdResult<PathResult> {
     let pdfium = init_pdfium(&app)?;
     crate::pdf::images_to_pdf(pdfium, &paths, &output_path)
+}
+
+/* ── AcroForm fields ─────────────────────────────────────────────── */
+
+#[tauri::command]
+pub async fn list_form_fields(state: State<'_, AppState>) -> CmdResult<Vec<FormFieldInfo>> {
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+    crate::pdf::list_form_fields(&doc.document)
+}
+
+#[tauri::command]
+pub async fn set_form_values(
+    state: State<'_, AppState>,
+    values: Vec<(String, String)>,
+) -> CmdResult<DocumentInfo> {
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    crate::pdf::set_form_values(&mut doc.document, &values)?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+/* ── Password protection ─────────────────────────────────────────── */
+
+/// Writes an unencrypted copy of `input` to `output`.
+#[tauri::command]
+pub async fn remove_password(
+    input: String,
+    output: String,
+    password: String,
+) -> CmdResult<PathResult> {
+    crate::security::remove_password(&input, &output, &password)
+}
+
+/// Writes an AES-128 encrypted copy of `input` to `output`.
+#[tauri::command]
+pub async fn set_password(
+    input: String,
+    output: String,
+    password: String,
+    owner_password: Option<String>,
+) -> CmdResult<PathResult> {
+    let owner = owner_password
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or_else(|| password.clone());
+    crate::security::set_password(&input, &output, &password, &owner)
 }
 
 /* ── Shell integration ───────────────────────────────────────────── */
