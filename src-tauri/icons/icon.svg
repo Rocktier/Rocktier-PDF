@@ -15,7 +15,7 @@
   <!-- Red dot (notification badge) top-right -->
   <circle cx="860" cy="164" r="36" fill="#FF3B30"/>
 
-  <!-- Product code: replace SQ with SQ / WP / PE / MD -->
-  <text x="512" y="640" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="360" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" letter-spacing="-20">SQ</text>
+  <!-- Product code: PE -->
+  <text x="512" y="640" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="360" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" letter-spacing="-20">PE</text>
   </g>
 </svg>
