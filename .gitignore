@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
+
+# Rust build artefacts
+src-tauri/target/
+src-tauri/gen/
+
+# Pdfium binaries are fetched at build time (npm run fetch:pdfium), not committed.
+src-tauri/resources/pdfium/
+src-tauri/resources/pdfium-runtime/
+
+*.log
+.env
+.vite/

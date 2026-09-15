@@ -1,0 +1,67 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+/* Scrollbars — thin and unobtrusive, Nothing-style */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+  background-clip: content-box;
+}
+
+/* The dot-matrix signature pattern from the Rocktier site */
+.dot-grid {
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
