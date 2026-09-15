@@ -2,7 +2,7 @@
 name = "rocktier-pdf-editor"
 version = "0.1.0"
 description = "Edit PDFs. Fast, private, no internet needed."
-authors = ["Rocktier <hello@rocktier.studio>"]
+authors = ["Rocktier <hello@rocktier.com>"]
 edition = "2021"
 rust-version = "1.77"
 
