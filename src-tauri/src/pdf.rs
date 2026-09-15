@@ -80,6 +80,9 @@ fn library_dirs(app: &tauri::AppHandle) -> Vec<PathBuf> {
 
     if let Ok(dir) = app.path().resource_dir() {
         dirs.push(dir.join("pdfium-runtime"));
+        // Tauri preserves the declared relative path (`resources/pdfium-runtime`)
+        // inside the bundle, so the library lands one level deeper.
+        dirs.push(dir.join("resources").join("pdfium-runtime"));
         dirs.push(dir);
     }
 

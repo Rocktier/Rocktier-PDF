@@ -17,7 +17,10 @@
       "icons/icon.ico",
       "icons/icon.png",
       "icons/icon.icns"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "Entitlements.plist"
+    }
   },
   "productName": "Rocktier PDF Editor",
   "version": "0.1.0",
