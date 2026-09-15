@@ -1,18 +1,27 @@
 import { useI18n, useT } from '../i18n';
-import type { DocumentInfo } from '../types';
+import type { AnnotTool, DocumentInfo } from '../types';
 import {
+  IconCopy,
+  IconExportImages,
   IconExtract,
+  IconHighlight,
+  IconImagesToPdf,
   IconMerge,
   IconMinus,
   IconMoon,
+  IconNote,
   IconOpen,
   IconPlus,
   IconRotateLeft,
   IconRotateRight,
   IconSave,
+  IconSign,
   IconSplit,
+  IconStamp,
+  IconStrikeout,
   IconSun,
   IconTrash,
+  IconUnderline,
   Logo,
 } from './Logo';
 
@@ -22,12 +31,19 @@ interface ToolbarProps {
   selectedCount: number;
   zoom: number;
   theme: 'dark' | 'light';
+  markupTool: AnnotTool | null;
+  onMarkupTool: (tool: AnnotTool | null) => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
   onMerge: () => void;
   onSplit: () => void;
   onExtract: () => void;
+  onCopyText: () => void;
+  onStamp: () => void;
+  onExportImages: () => void;
+  onImagesToPdf: () => void;
+  onSign: () => void;
   onRotate: (degrees: number) => void;
   onDelete: () => void;
   onZoom: (zoom: number) => void;
@@ -42,12 +58,19 @@ export function Toolbar({
   selectedCount,
   zoom,
   theme,
+  markupTool,
+  onMarkupTool,
   onOpen,
   onSave,
   onSaveAs,
   onMerge,
   onSplit,
   onExtract,
+  onCopyText,
+  onStamp,
+  onExportImages,
+  onImagesToPdf,
+  onSign,
   onRotate,
   onDelete,
   onZoom,
@@ -119,6 +142,64 @@ export function Toolbar({
       <button className="btn" onClick={onExtract} disabled={!doc || busy || !hasSelection}>
         <IconExtract />
         {t('toolbar.extract')}
+      </button>
+      <button className="btn btn-icon" onClick={onCopyText} disabled={!doc || busy || !hasSelection} title={t('toolbar.copyText')}>
+        <IconCopy />
+      </button>
+      <button className="btn" onClick={onStamp} disabled={!doc || busy}>
+        <IconStamp />
+        {t('stamp.pageNumbers')}
+      </button>
+      <button className="btn" onClick={onExportImages} disabled={!doc || busy}>
+        <IconExportImages />
+        {t('toolbar.exportImages')}
+      </button>
+      <button className="btn" onClick={onImagesToPdf} disabled={busy}>
+        <IconImagesToPdf />
+        {t('toolbar.imagesToPdf')}
+      </button>
+
+      <div className="toolbar-sep" />
+
+      <button
+        className={`btn btn-icon${markupTool === 'highlight' ? ' active' : ''}`}
+        onClick={() => onMarkupTool(markupTool === 'highlight' ? null : 'highlight')}
+        disabled={!doc || busy}
+        title={t('markup.highlight')}
+      >
+        <IconHighlight />
+      </button>
+      <button
+        className={`btn btn-icon${markupTool === 'underline' ? ' active' : ''}`}
+        onClick={() => onMarkupTool(markupTool === 'underline' ? null : 'underline')}
+        disabled={!doc || busy}
+        title={t('markup.underline')}
+      >
+        <IconUnderline />
+      </button>
+      <button
+        className={`btn btn-icon${markupTool === 'strikeout' ? ' active' : ''}`}
+        onClick={() => onMarkupTool(markupTool === 'strikeout' ? null : 'strikeout')}
+        disabled={!doc || busy}
+        title={t('markup.strikeout')}
+      >
+        <IconStrikeout />
+      </button>
+      <button
+        className={`btn btn-icon${markupTool === 'note' ? ' active' : ''}`}
+        onClick={() => onMarkupTool(markupTool === 'note' ? null : 'note')}
+        disabled={!doc || busy}
+        title={t('markup.note')}
+      >
+        <IconNote />
+      </button>
+      <button
+        className={`btn btn-icon${markupTool === 'sign' ? ' active' : ''}`}
+        onClick={onSign}
+        disabled={!doc || busy}
+        title={t('toolbar.sign')}
+      >
+        <IconSign />
       </button>
 
       <div className="toolbar-spacer" />

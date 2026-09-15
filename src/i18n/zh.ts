@@ -17,6 +17,10 @@ export const zh: Strings = {
     close: '关闭',
     theme: '主题',
     language: '语言',
+    copyText: '复制文本',
+    exportImages: '导出图片',
+    imagesToPdf: '图片转 PDF',
+    sign: '签名',
   },
 
   empty: {
@@ -78,6 +82,54 @@ export const zh: Strings = {
     actual: '实际大小',
   },
 
+  find: {
+    placeholder: '在文档中查找',
+    prev: '上一个',
+    next: '下一个',
+    close: '关闭',
+    none: '无匹配',
+  },
+
+  markup: {
+    highlight: '高亮',
+    underline: '下划线',
+    strikeout: '删除线',
+    note: '便签',
+    hint: '在要标注的文字上拖拽',
+    done: '已添加标注',
+  },
+
+  sign: {
+    pick: '选择签名图片',
+    hint: '在页面上点击放置签名',
+    done: '已放置签名',
+  },
+
+  note: {
+    title: '添加便签',
+    label: '便签内容',
+    placeholder: '输入便签内容…',
+    cancel: '取消',
+    run: '添加',
+    done: '已添加便签',
+  },
+
+  stamp: {
+    title: '页码与水印',
+    kind: '类型',
+    pageNumbers: '页码',
+    watermark: '水印',
+    text: '水印文字',
+    textPlaceholder: '例如 机密',
+    fontSize: '字号',
+    margin: '底部边距',
+    opacity: '不透明度',
+    cancel: '取消',
+    run: '应用',
+    done: '已应用到每一页',
+    needText: '请输入水印文字',
+  },
+
   toast: {
     saved: '已保存到 {name}',
     deleted: '已删除 {count} 页',
@@ -85,6 +137,10 @@ export const zh: Strings = {
     moved: '页面已移动',
     opened: '已打开 {name}',
     revealed: '已在文件管理器中显示',
+    copied: '已复制到剪贴板',
+    noText: '所选页面没有文本',
+    exported: '已导出 {count} 张图片',
+    imagesPdf: '已生成 {name}',
   },
 
   error: {

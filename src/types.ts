@@ -36,6 +36,33 @@ export interface PathResult {
   size: number;
 }
 
+export interface SearchHit {
+  /** Zero-based page index. */
+  page: number;
+  /** Bounds in PDF points, origin at the bottom-left, rotation excluded. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type StampKind = 'pageNumbers' | 'watermark';
+
+export type MarkupKind = 'highlight' | 'underline' | 'strikeout';
+
+/** Any annotation tool the user can arm: rect marks, notes, and signatures. */
+export type AnnotTool = MarkupKind | 'note' | 'sign';
+
+export interface MarkupRect {
+  /** Zero-based page index. */
+  page: number;
+  /** Bounds in PDF points, origin bottom-left. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export type SplitMode =
   /** One file per page. */
   | { kind: 'everyPage' }

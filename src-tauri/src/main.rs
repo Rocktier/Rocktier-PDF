@@ -22,6 +22,14 @@ fn main() {
             commands::extract_pages,
             commands::merge_documents,
             commands::split_document,
+            commands::search_document,
+            commands::page_text,
+            commands::stamp_document,
+            commands::export_page_images,
+            commands::images_to_pdf,
+            commands::add_markup,
+            commands::add_note,
+            commands::add_signature,
             commands::reveal_in_finder,
         ])
         .run(tauri::generate_context!())

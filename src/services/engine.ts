@@ -1,6 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import type { DocumentInfo, PathResult, RenderedPage, SplitMode } from '../types';
+import type {
+  DocumentInfo,
+  MarkupKind,
+  MarkupRect,
+  PathResult,
+  RenderedPage,
+  SearchHit,
+  SplitMode,
+  StampKind,
+} from '../types';
 
 /**
  * Every backend call goes through this module. Components never import
@@ -56,6 +65,89 @@ export async function revealInFinder(path: string): Promise<void> {
   return invoke<void>('reveal_in_finder', { path });
 }
 
+/* ── Text & search ──────────────────────────────────────────────── */
+
+/** Find every occurrence of `query`, across all pages. */
+export async function searchDocument(
+  query: string,
+  matchCase = false,
+  wholeWord = false
+): Promise<SearchHit[]> {
+  return invoke<SearchHit[]>('search_document', { query, matchCase, wholeWord });
+}
+
+/** Concatenated plain text of the given pages. */
+export async function pageText(indices: number[]): Promise<string> {
+  return invoke<string>('page_text', { indices });
+}
+
+/** Copy text to the OS clipboard via the webview Clipboard API. */
+export async function copyText(text: string): Promise<void> {
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+}
+
+/* ── Stamping ───────────────────────────────────────────────────── */
+
+/** Add page numbers or a text watermark to every page. */
+export async function stampDocument(
+  kind: StampKind,
+  text: string,
+  fontSize: number,
+  margin: number,
+  opacity: number
+): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('stamp_document', { kind, text, fontSize, margin, opacity });
+}
+
+/* ── Import / export images ─────────────────────────────────────── */
+
+/** Draw a highlight / underline / strikeout over a dragged rectangle. */
+export async function addMarkup(
+  kind: MarkupKind,
+  rect: MarkupRect,
+  color: [number, number, number],
+  opacity: number
+): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('add_markup', { kind, rect, color, opacity });
+}
+
+/** Add a sticky note anchored at a point (PDF points, bottom-left origin). */
+export async function addNote(
+  page: number,
+  x: number,
+  y: number,
+  text: string,
+  color: [number, number, number]
+): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('add_note', { page, x, y, text, color });
+}
+
+/** Place a signature image at a point (PDF points, bottom-left origin). */
+export async function addSignature(
+  page: number,
+  x: number,
+  y: number,
+  width: number,
+  imagePath: string
+): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('add_signature', { page, x, y, width, imagePath });
+}
+
+/** Export the given pages as PNG files into `outputDir`. */
+export async function exportPageImages(
+  indices: number[],
+  outputDir: string,
+  width: number
+): Promise<PathResult[]> {
+  return invoke<PathResult[]>('export_page_images', { indices, outputDir, width });
+}
+
+/** Build a PDF (one page per image) from image files. */
+export async function imagesToPdf(paths: string[], outputPath: string): Promise<PathResult> {
+  return invoke<PathResult>('images_to_pdf', { paths, outputPath });
+}
+
 /* ── Native dialogs ─────────────────────────────────────────────── */
 
 export async function pickPdf(): Promise<string | null> {
@@ -87,6 +179,16 @@ export async function pickSavePath(defaultName: string): Promise<string | null> 
 export async function pickDirectory(): Promise<string | null> {
   const result = await openDialog({ multiple: false, directory: true });
   return typeof result === 'string' ? result : null;
+}
+
+export async function pickImages(): Promise<string[]> {
+  const result = await openDialog({
+    multiple: true,
+    directory: false,
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg'] }],
+  });
+  if (!result) return [];
+  return Array.isArray(result) ? result : [result];
 }
 
 /* ── Helpers ────────────────────────────────────────────────────── */

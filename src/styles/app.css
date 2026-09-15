@@ -272,6 +272,94 @@
   pointer-events: none;
 }
 
+/* ── Search highlights ────────────────────────────────────────── */
+.hit {
+  position: absolute;
+  background: rgba(255, 214, 0, 0.35);
+  border-radius: 1px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.hit.active {
+  background: rgba(255, 138, 0, 0.5);
+  outline: 1px solid rgba(255, 120, 0, 0.95);
+}
+
+/* ── Markup annotation layer ──────────────────────────────────── */
+.annot-layer {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  z-index: 5;
+}
+
+.annot-preview {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(255, 235, 59, 0.4);
+}
+
+.annot-preview.underline {
+  background: rgba(229, 57, 53, 0.85);
+}
+
+.annot-preview.strikeout {
+  background: rgba(229, 57, 53, 0.85);
+}
+
+.btn.active {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+/* ── Viewer wrapper + find bar ────────────────────────────────── */
+.viewer-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.findbar {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.findbar-input {
+  width: 180px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  user-select: text;
+}
+
+.findbar-input:focus {
+  border-color: var(--border-hover);
+}
+
+.findbar-count {
+  min-width: 48px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
 /* ── Drop zone / empty state ──────────────────────────────────── */
 .empty {
   flex: 1;

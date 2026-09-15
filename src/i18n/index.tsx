@@ -39,7 +39,10 @@ const LangContext = createContext<LangContextValue>({
   t: (p, v) => interpolate(lookup(en, p), v),
 });
 
-/** English is the default: the product targets an international audience. */
+/** English is the default: the product targets an international audience.
+ *
+ * The system locale is deliberately ignored — the family convention is a fixed
+ * English default, with the user's manual choice the only thing remembered. */
 function detectLang(): Lang {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -47,9 +50,7 @@ function detectLang(): Lang {
   } catch {
     /* localStorage unavailable — fall through */
   }
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('zh')
-    ? 'zh'
-    : 'en';
+  return 'en';
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {

@@ -85,6 +85,66 @@ export const IconSplit = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+export const IconSign = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M2.5 11.5c2 0 3-1.1 4-3.3s2-4.2 3.1-4.2c1 0 1.2 1 1.5 2.4.3 1.5.7 2.4 1.7 2.4.5 0 .9-.2 1.2-.5" />
+    <path d="M2.5 13.5h11" />
+  </svg>
+);
+
+export const IconNote = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3 3.5h10v6.5L9.5 14H3V3.5Z" />
+    <path d="M12.5 10H9.5v3.5" />
+    <path d="M5.5 6.3h5M5.5 8.4h3" />
+  </svg>
+);
+
+export const IconHighlight = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M3 13.5h10" />
+    <path d="M4.2 11 9.8 3.2a1.4 1.4 0 0 1 2-.4l1 .8a1.4 1.4 0 0 1 .4 2L7 13" />
+  </svg>
+);
+
+export const IconUnderline = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M4.5 3v5a3.5 3.5 0 0 0 7 0V3" />
+    <path d="M3 13.5h10" />
+  </svg>
+);
+
+export const IconStrikeout = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M4.5 4.5c0-1 .9-1.7 3-1.7 1.6 0 2.6.5 3 1.3" />
+    <path d="M11.5 11.5c0 1-.9 1.7-3 1.7-1.6 0-2.6-.5-3-1.3" />
+    <path d="M3 8h10" />
+  </svg>
+);
+
+export const IconExportImages = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="2.5" y="3.5" width="11" height="9" rx="1.2" />
+    <path d="M2.5 10.2 5.4 7.8l2.4 1.8 2-1.5 3.2 2.3" />
+    <circle cx="5.9" cy="6.3" r="1" />
+  </svg>
+);
+
+export const IconImagesToPdf = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="2.5" y="2.5" width="7" height="8.5" rx="1" />
+    <path d="M2.5 8.6 5 6.7l2.5 1.9" />
+    <path d="M11 8.5v5M8.5 11h5" />
+  </svg>
+);
+
+export const IconStamp = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="2.5" y="9.5" width="11" height="4" rx="1" />
+    <path d="M4.5 9.5V6a3.5 3.5 0 0 1 7 0v3.5" />
+  </svg>
+);
+
 export const IconRotateLeft = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M2.5 8a5.5 5.5 0 1 1 1.8 4.1" />
@@ -109,6 +169,13 @@ export const IconExtract = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M8 2.5v7M8 9.5 5 7M8 9.5 11 7" />
     <path d="M2.5 11.5v2h11v-2" />
+  </svg>
+);
+
+export const IconCopy = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.2" />
+    <path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
   </svg>
 );
 

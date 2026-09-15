@@ -11,7 +11,8 @@ use tauri::{AppHandle, State};
 
 use crate::pdf::{
     degrees_of, doc_info, init_pdfium, parse_ranges, render_page as render_page_impl,
-    rotation_of, DocumentInfo, PathResult, RenderedPage, SplitMode,
+    rotation_of, DocumentInfo, MarkupKind, MarkupRect, PathResult, RenderedPage, SearchHit,
+    SplitMode, StampKind,
 };
 use crate::state::{AppState, OpenDoc};
 
@@ -344,6 +345,169 @@ pub async fn split_document(
     }
 
     Ok(results)
+}
+
+/* ── Text & search ───────────────────────────────────────────────── */
+
+/// Find every occurrence of `query` across all pages.
+#[tauri::command]
+pub async fn search_document(
+    state: State<'_, AppState>,
+    query: String,
+    match_case: bool,
+    whole_word: bool,
+) -> CmdResult<Vec<SearchHit>> {
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+    crate::pdf::search_document(&doc.document, &query, match_case, whole_word)
+}
+
+/// Concatenated plain text of the given pages, for "copy page text".
+#[tauri::command]
+pub async fn page_text(state: State<'_, AppState>, indices: Vec<i32>) -> CmdResult<String> {
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+    let total = doc.document.pages().len();
+
+    let mut sorted = indices;
+    sorted.sort_unstable();
+    sorted.dedup();
+
+    let mut out = String::new();
+    for index in sorted {
+        if index < 0 || index >= total {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push_str("\n\n");
+        }
+        out.push_str(&crate::pdf::page_text(&doc.document, index)?);
+    }
+    Ok(out)
+}
+
+/* ── Stamping ────────────────────────────────────────────────────── */
+
+/// Adds page numbers or a text watermark to every page.
+#[tauri::command]
+pub async fn stamp_document(
+    state: State<'_, AppState>,
+    kind: StampKind,
+    text: String,
+    font_size: f32,
+    margin: f32,
+    opacity: f32,
+) -> CmdResult<DocumentInfo> {
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    crate::pdf::apply_stamp(&mut doc.document, kind, &text, font_size, margin, opacity)?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+/* ── Annotations ─────────────────────────────────────────────────── */
+
+/// Draws a highlight / underline / strikeout over the dragged rectangle.
+#[tauri::command]
+pub async fn add_markup(
+    state: State<'_, AppState>,
+    kind: MarkupKind,
+    rect: MarkupRect,
+    color: Vec<u8>,
+    opacity: f32,
+) -> CmdResult<DocumentInfo> {
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    let c = (
+        *color.first().unwrap_or(&255),
+        *color.get(1).unwrap_or(&235),
+        *color.get(2).unwrap_or(&59),
+    );
+
+    crate::pdf::add_markup(&mut doc.document, kind, rect, c, opacity)?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+/// Adds a sticky note at the given point.
+#[tauri::command]
+pub async fn add_note(
+    state: State<'_, AppState>,
+    page: i32,
+    x: f32,
+    y: f32,
+    text: String,
+    color: Vec<u8>,
+) -> CmdResult<DocumentInfo> {
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    let c = (
+        *color.first().unwrap_or(&255),
+        *color.get(1).unwrap_or(&200),
+        *color.get(2).unwrap_or(&0),
+    );
+
+    crate::pdf::add_note(&mut doc.document, page, x, y, &text, c)?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+/// Places a signature image at the given point on a page.
+#[tauri::command]
+pub async fn add_signature(
+    state: State<'_, AppState>,
+    page: i32,
+    x: f32,
+    y: f32,
+    width: f32,
+    image_path: String,
+) -> CmdResult<DocumentInfo> {
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    crate::pdf::add_signature(&mut doc.document, page, x, y, width, &image_path)?;
+    doc.dirty = true;
+    doc_info(&doc.document, &doc.path, true)
+}
+
+/* ── Import / export images ──────────────────────────────────────── */
+
+/// Export the given pages as PNG files into `output_dir`.
+#[tauri::command]
+pub async fn export_page_images(
+    state: State<'_, AppState>,
+    indices: Vec<i32>,
+    output_dir: String,
+    width: i32,
+) -> CmdResult<Vec<PathResult>> {
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+
+    let total = doc.document.pages().len();
+    let mut sorted = indices;
+    sorted.sort_unstable();
+    sorted.dedup();
+    for &i in &sorted {
+        if i < 0 || i >= total {
+            return Err(format!("Page {} is out of range", i + 1));
+        }
+    }
+
+    crate::pdf::export_pages_as_png(&doc.document, &sorted, &output_dir, &file_stem(&doc.path), width)
+}
+
+/// Build a PDF from a list of image files (JPEG / PNG).
+#[tauri::command]
+pub async fn images_to_pdf(
+    app: AppHandle,
+    paths: Vec<String>,
+    output_path: String,
+) -> CmdResult<PathResult> {
+    let pdfium = init_pdfium(&app)?;
+    crate::pdf::images_to_pdf(pdfium, &paths, &output_path)
 }
 
 /* ── Shell integration ───────────────────────────────────────────── */

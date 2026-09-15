@@ -15,6 +15,10 @@ export const en = {
     close: 'Close',
     theme: 'Theme',
     language: 'Language',
+    copyText: 'Copy text',
+    exportImages: 'To images',
+    imagesToPdf: 'Images to PDF',
+    sign: 'Sign',
   },
 
   empty: {
@@ -76,6 +80,54 @@ export const en = {
     actual: 'Actual size',
   },
 
+  find: {
+    placeholder: 'Find in document',
+    prev: 'Previous match',
+    next: 'Next match',
+    close: 'Close',
+    none: 'No matches',
+  },
+
+  markup: {
+    highlight: 'Highlight',
+    underline: 'Underline',
+    strikeout: 'Strikeout',
+    note: 'Note',
+    hint: 'Drag across the text you want to mark up',
+    done: 'Markup added',
+  },
+
+  sign: {
+    pick: 'Choose a signature image',
+    hint: 'Click on the page to place your signature',
+    done: 'Signature placed',
+  },
+
+  note: {
+    title: 'Add a note',
+    label: 'Note',
+    placeholder: 'Type a note…',
+    cancel: 'Cancel',
+    run: 'Add',
+    done: 'Note added',
+  },
+
+  stamp: {
+    title: 'Page numbers & watermark',
+    kind: 'Type',
+    pageNumbers: 'Page numbers',
+    watermark: 'Watermark',
+    text: 'Watermark text',
+    textPlaceholder: 'e.g. CONFIDENTIAL',
+    fontSize: 'Font size',
+    margin: 'Bottom margin',
+    opacity: 'Opacity',
+    cancel: 'Cancel',
+    run: 'Apply',
+    done: 'Applied to every page',
+    needText: 'Enter some watermark text',
+  },
+
   toast: {
     saved: 'Saved to {name}',
     deleted: 'Deleted {count} page(s)',
@@ -83,6 +135,10 @@ export const en = {
     moved: 'Page moved',
     opened: 'Opened {name}',
     revealed: 'Revealed in file manager',
+    copied: 'Copied to clipboard',
+    noText: 'No text on the selected pages',
+    exported: 'Exported {count} image(s)',
+    imagesPdf: 'Created {name}',
   },
 
   error: {

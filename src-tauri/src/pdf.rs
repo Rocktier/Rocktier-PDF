@@ -214,6 +214,385 @@ pub fn rotation_of(degrees: i32) -> PdfPageRenderRotation {
     }
 }
 
+/* ── Text extraction & search ────────────────────────────────────── */
+
+/// A single search hit, in PDF points (origin bottom-left, rotation excluded).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub page: i32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// The full Unicode text of a page, in reading order.
+pub fn page_text(doc: &PdfDocument, index: i32) -> Result<String, String> {
+    let page = doc.pages().get(index).map_err(|e| e.to_string())?;
+    let text = page.text().map_err(|e| e.to_string())?;
+    Ok(text.all())
+}
+
+/// Case-insensitive (by default) search across every page, returning the
+/// bounding box of each hit. Capped so a pathological document cannot flood
+/// the IPC channel.
+pub fn search_document(
+    doc: &PdfDocument,
+    needle: &str,
+    match_case: bool,
+    whole_word: bool,
+) -> Result<Vec<SearchHit>, String> {
+    const MAX_HITS: usize = 5000;
+
+    let needle = needle.trim();
+    if needle.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let options = PdfSearchOptions::new()
+        .match_case(match_case)
+        .match_whole_word(whole_word);
+
+    let mut hits: Vec<SearchHit> = Vec::new();
+    for index in 0..doc.pages().len() {
+        let page = doc.pages().get(index).map_err(|e| e.to_string())?;
+        let text = page.text().map_err(|e| e.to_string())?;
+        let search = text.search(needle, &options).map_err(|e| e.to_string())?;
+        while let Some(segments) = search.find_next() {
+            for segment in segments.iter() {
+                let b = segment.bounds();
+                hits.push(SearchHit {
+                    page: index,
+                    x: b.left().value,
+                    y: b.bottom().value,
+                    width: b.width().value,
+                    height: b.height().value,
+                });
+            }
+            if hits.len() >= MAX_HITS {
+                return Ok(hits);
+            }
+        }
+    }
+    Ok(hits)
+}
+
+/* ── Stamping (page numbers & watermark) ─────────────────────────── */
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum StampKind {
+    /// "n / total" at the foot of every page.
+    PageNumbers,
+    /// A diagonal text watermark in the centre of every page.
+    Watermark,
+}
+
+/// Adds either page numbers or a text watermark to every page.
+///
+/// Both are ordinary text objects rather than annotations: they render in every
+/// viewer, survive flattening, and print identically everywhere.
+pub fn apply_stamp(
+    doc: &mut PdfDocument,
+    kind: StampKind,
+    text: &str,
+    font_size: f32,
+    margin: f32,
+    opacity: f32,
+) -> Result<(), String> {
+    let total = doc.pages().len();
+    if total == 0 {
+        return Err("This PDF has no pages".to_string());
+    }
+
+    let font = doc.fonts_mut().helvetica();
+    let size = font_size.clamp(4.0, 200.0);
+    let alpha = (opacity.clamp(0.05, 1.0) * 255.0).round() as u8;
+
+    for index in 0..total {
+        let (page_width, page_height) = {
+            let page = doc.pages().get(index).map_err(|e| e.to_string())?;
+            (page.width().value, page.height().value)
+        };
+
+        let label = match kind {
+            StampKind::PageNumbers => format!("{} / {}", index + 1, total),
+            StampKind::Watermark => text.to_string(),
+        };
+        if label.trim().is_empty() {
+            continue;
+        }
+
+        let mut object = PdfPageTextObject::new(doc, &label, font, PdfPoints::new(size))
+            .map_err(|e| e.to_string())?;
+        object
+            .set_fill_color(PdfColor::new(0, 0, 0, alpha))
+            .map_err(|e| e.to_string())?;
+
+        // Helvetica averages ~0.52 em per glyph; close enough for centring.
+        let approx_width = label.chars().count() as f32 * size * 0.52;
+        let mut matrix = PdfMatrix::IDENTITY;
+
+        match kind {
+            StampKind::PageNumbers => {
+                matrix.set_e((page_width - approx_width) / 2.0);
+                matrix.set_f(margin.clamp(4.0, page_height / 3.0));
+            }
+            StampKind::Watermark => {
+                let (sin, cos) = 45.0_f32.to_radians().sin_cos();
+                matrix.set_a(cos);
+                matrix.set_b(sin);
+                matrix.set_c(-sin);
+                matrix.set_d(cos);
+                matrix.set_e(page_width / 2.0 - (approx_width * cos) / 2.0);
+                matrix.set_f(page_height / 2.0);
+            }
+        }
+
+        object.apply_matrix(matrix).map_err(|e| e.to_string())?;
+
+        doc.pages_mut()
+            .get(index)
+            .map_err(|e| e.to_string())?
+            .objects_mut()
+            .add_text_object(object)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/* ── Annotations / markup ────────────────────────────────────────── */
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum MarkupKind {
+    Highlight,
+    Underline,
+    Strikeout,
+}
+
+/// A rectangle the user dragged, in PDF points (origin bottom-left).
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkupRect {
+    pub page: i32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Draws a highlight / underline / strikeout over the given rectangle.
+///
+/// These are ordinary filled vector objects rather than `/Annots`, so they
+/// render and print identically everywhere without depending on annotation
+/// appearance streams (which Pdfium does not generate for us).
+pub fn add_markup(
+    doc: &mut PdfDocument,
+    kind: MarkupKind,
+    rect: MarkupRect,
+    color: (u8, u8, u8),
+    opacity: f32,
+) -> Result<(), String> {
+    let total = doc.pages().len();
+    if rect.page < 0 || rect.page >= total {
+        return Err("Page out of range".to_string());
+    }
+    if rect.width <= 0.5 || rect.height <= 0.5 {
+        return Err("Selection is too small".to_string());
+    }
+
+    let (r, g, b) = color;
+    let alpha = (opacity.clamp(0.05, 1.0) * 255.0).round() as u8;
+    let fill = PdfColor::new(r, g, b, alpha);
+
+    let (x1, y1, x2, y2) = match kind {
+        MarkupKind::Highlight => (rect.x, rect.y, rect.x + rect.width, rect.y + rect.height),
+        MarkupKind::Underline => {
+            let t = (rect.height * 0.08).clamp(1.0, 3.0);
+            (rect.x, rect.y, rect.x + rect.width, rect.y + t)
+        }
+        MarkupKind::Strikeout => {
+            let t = (rect.height * 0.08).clamp(1.0, 3.0);
+            let mid = rect.y + rect.height / 2.0;
+            (rect.x, mid, rect.x + rect.width, mid + t)
+        }
+    };
+
+    let mut path = PdfPagePathObject::new(
+        doc,
+        PdfPoints::new(x1),
+        PdfPoints::new(y1),
+        None,
+        None,
+        Some(fill),
+    )
+    .map_err(|e| e.to_string())?;
+    path.rect_to(PdfPoints::new(x2), PdfPoints::new(y2))
+        .map_err(|e| e.to_string())?;
+
+    doc.pages_mut()
+        .get(rect.page)
+        .map_err(|e| e.to_string())?
+        .objects_mut()
+        .add_path_object(path)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Adds a sticky-note (Text) annotation anchored at the given point.
+pub fn add_note(
+    doc: &mut PdfDocument,
+    page: i32,
+    x: f32,
+    y: f32,
+    text: &str,
+    color: (u8, u8, u8),
+) -> Result<(), String> {
+    let total = doc.pages().len();
+    if page < 0 || page >= total {
+        return Err("Page out of range".to_string());
+    }
+    if text.trim().is_empty() {
+        return Err("Note text is empty".to_string());
+    }
+
+    let mut page_obj = doc.pages_mut().get(page).map_err(|e| e.to_string())?;
+    let mut note = page_obj
+        .annotations_mut()
+        .create_text_annotation(text)
+        .map_err(|e| e.to_string())?;
+
+    note.set_position(PdfPoints::new(x), PdfPoints::new(y))
+        .map_err(|e| e.to_string())?;
+    note.set_width(PdfPoints::new(22.0)).map_err(|e| e.to_string())?;
+    note.set_height(PdfPoints::new(22.0)).map_err(|e| e.to_string())?;
+    note.set_stroke_color(PdfColor::new(color.0, color.1, color.2, 255))
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Places a signature image (typically a transparent PNG) so its bottom-left
+/// corner sits at the given point.
+pub fn add_signature(
+    doc: &mut PdfDocument,
+    page: i32,
+    x: f32,
+    y: f32,
+    width: f32,
+    image_path: &str,
+) -> Result<(), String> {
+    let total = doc.pages().len();
+    if page < 0 || page >= total {
+        return Err("Page out of range".to_string());
+    }
+
+    let image = image::open(image_path).map_err(|e| format!("Cannot read image: {e}"))?;
+    let ratio = if image.width() == 0 {
+        0.5
+    } else {
+        image.height() as f32 / image.width() as f32
+    };
+
+    let w = width.clamp(20.0, 1000.0);
+    let h = w * ratio;
+
+    let mut object = PdfPageImageObject::new_with_size(doc, &image, PdfPoints::new(w), PdfPoints::new(h))
+        .map_err(|e| e.to_string())?;
+
+    let mut matrix = PdfMatrix::IDENTITY;
+    matrix.set_e(x);
+    matrix.set_f(y);
+    object.apply_matrix(matrix).map_err(|e| e.to_string())?;
+
+    doc.pages_mut()
+        .get(page)
+        .map_err(|e| e.to_string())?
+        .objects_mut()
+        .add_image_object(object)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/* ── Import / export images ──────────────────────────────────────── */
+
+/// Renders the given pages to individual PNG files inside `output_dir`.
+pub fn export_pages_as_png(
+    doc: &PdfDocument,
+    indices: &[i32],
+    output_dir: &str,
+    base_name: &str,
+    width: Pixels,
+) -> Result<Vec<PathResult>, String> {
+    if indices.is_empty() {
+        return Err("No pages selected".to_string());
+    }
+    std::fs::create_dir_all(output_dir).map_err(|e| format!("Cannot create folder: {e}"))?;
+
+    let mut results = Vec::with_capacity(indices.len());
+    for &index in indices {
+        let page = render_page(doc, index, width)?;
+        let encoded = page.data_url.split(',').nth(1).unwrap_or("");
+        let bytes = BASE64.decode(encoded).map_err(|e| e.to_string())?;
+        let file = PathBuf::from(output_dir).join(format!("{base_name}_{:04}.png", index + 1));
+        std::fs::write(&file, &bytes).map_err(|e| format!("Cannot write image: {e}"))?;
+        results.push(PathResult {
+            path: file.to_string_lossy().to_string(),
+            size: bytes.len() as u64,
+        });
+    }
+    Ok(results)
+}
+
+/// Builds a new PDF with one page per image (JPEG or PNG), each page sized to
+/// the image at 96 dpi so it lands at its natural printed size.
+pub fn images_to_pdf(
+    pdfium: &Pdfium,
+    paths: &[String],
+    output_path: &str,
+) -> Result<PathResult, String> {
+    if paths.is_empty() {
+        return Err("Pick at least one image".to_string());
+    }
+
+    let mut doc = pdfium.create_new_pdf().map_err(|e| e.to_string())?;
+
+    for path in paths {
+        let image = image::open(path).map_err(|e| format!("Cannot read {path}: {e}"))?;
+        let width_pt = PdfPoints::new(image.width() as f32 * 72.0 / 96.0);
+        let height_pt = PdfPoints::new(image.height() as f32 * 72.0 / 96.0);
+
+        doc.pages_mut()
+            .create_page_at_end(PdfPagePaperSize::from_points(width_pt, height_pt))
+            .map_err(|e| e.to_string())?;
+
+        let object = PdfPageImageObject::new_with_size(&doc, &image, width_pt, height_pt)
+            .map_err(|e| e.to_string())?;
+
+        let last = doc.pages().len() - 1;
+        doc.pages_mut()
+            .get(last)
+            .map_err(|e| e.to_string())?
+            .objects_mut()
+            .add_image_object(object)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let out = if output_path.to_lowercase().ends_with(".pdf") {
+        output_path.to_string()
+    } else {
+        format!("{output_path}.pdf")
+    };
+    doc.save_to_file(&out).map_err(|e| e.to_string())?;
+    let size = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
+    Ok(PathResult { path: out, size })
+}
+
 /* ── Page range parsing ──────────────────────────────────────────── */
 
 /// Parse `"1-3, 5, 8-"` into zero-based inclusive `(start, end)` pairs.

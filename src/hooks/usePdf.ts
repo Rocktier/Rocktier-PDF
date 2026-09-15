@@ -9,10 +9,14 @@ import {
   rotatePages,
   saveDocument,
   splitDocument,
+  stampDocument,
+  addMarkup,
+  addNote,
+  addSignature,
 } from '../services/engine';
 import { clearRenderCache } from '../services/renderCache';
 import { fileStem } from '../services/engine';
-import type { DocumentInfo, SplitMode } from '../types';
+import type { DocumentInfo, MarkupKind, MarkupRect, SplitMode, StampKind } from '../types';
 
 /**
  * Owns the single open document and every mutation that touches it.
@@ -148,6 +152,42 @@ export function usePdf() {
     [run]
   );
 
+  const stamp = useCallback(
+    async (kind: StampKind, text: string, fontSize: number, margin: number, opacity: number) => {
+      const info = await run(() => stampDocument(kind, text, fontSize, margin, opacity));
+      if (info) applyDoc(info);
+      return info;
+    },
+    [applyDoc, run]
+  );
+
+  const markup = useCallback(
+    async (kind: MarkupKind, rect: MarkupRect, color: [number, number, number], opacity: number) => {
+      const info = await run(() => addMarkup(kind, rect, color, opacity));
+      if (info) applyDoc(info);
+      return info;
+    },
+    [applyDoc, run]
+  );
+
+  const note = useCallback(
+    async (page: number, x: number, y: number, text: string, color: [number, number, number]) => {
+      const info = await run(() => addNote(page, x, y, text, color));
+      if (info) applyDoc(info);
+      return info;
+    },
+    [applyDoc, run]
+  );
+
+  const signature = useCallback(
+    async (page: number, x: number, y: number, width: number, imagePath: string) => {
+      const info = await run(() => addSignature(page, x, y, width, imagePath));
+      if (info) applyDoc(info);
+      return info;
+    },
+    [applyDoc, run]
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -167,6 +207,10 @@ export function usePdf() {
     extract,
     merge,
     split,
+    stamp,
+    markup,
+    note,
+    signature,
     clearError,
   };
 }

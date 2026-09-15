@@ -1,18 +1,34 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { DropZone } from './components/DropZone';
+import { FindBar } from './components/FindBar';
 import { MergeDialog } from './components/MergeDialog';
+import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
 import { SplitDialog } from './components/SplitDialog';
+import { StampDialog } from './components/StampDialog';
 import { StatusBar } from './components/StatusBar';
 import { ThumbnailRail } from './components/ThumbnailRail';
 import { Toolbar } from './components/Toolbar';
 import { usePdf } from './hooks/usePdf';
 import { useT } from './i18n';
-import { fileStem, pickPdf, pickSavePath, revealInFinder } from './services/engine';
+import {
+  copyText,
+  exportPageImages,
+  fileStem,
+  imagesToPdf,
+  pageText,
+  pickDirectory,
+  pickImages,
+  pickPdf,
+  pickSavePath,
+  revealInFinder,
+  searchDocument,
+} from './services/engine';
+import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
-type Dialog = 'merge' | 'split' | null;
+type Dialog = 'merge' | 'split' | 'stamp' | null;
 
 const THEME_KEY = 'rocktier-pdf-editor.theme';
 
@@ -27,6 +43,15 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [dragActive, setDragActive] = useState(false);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [activeHit, setActiveHit] = useState(0);
+  const searchToken = useRef(0);
+  const [markupTool, setMarkupTool] = useState<AnnotTool | null>(null);
+  const [noteAt, setNoteAt] = useState<{ page: number; x: number; y: number } | null>(null);
+  const [sigPath, setSigPath] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -83,6 +108,9 @@ export function App() {
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         void save();
+      } else if (mod && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        if (pdf.doc) setFindOpen(true);
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && pdf.selected.length > 0) {
         e.preventDefault();
         void removeSelected();
@@ -91,7 +119,59 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf.selected]);
+  }, [pdf.selected, pdf.doc]);
+
+  /* ── Find ───────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!findOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setFindOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [findOpen]);
+
+  // Debounced full-document search; a token guards against out-of-order replies.
+  useEffect(() => {
+    if (!findOpen || !findQuery.trim() || !pdf.doc) {
+      setHits([]);
+      setActiveHit(0);
+      return;
+    }
+    const token = ++searchToken.current;
+    const handle = window.setTimeout(() => {
+      void searchDocument(findQuery)
+        .then((result) => {
+          if (token !== searchToken.current) return;
+          setHits(result);
+          setActiveHit(0);
+        })
+        .catch(() => {
+          if (token === searchToken.current) setHits([]);
+        });
+    }, 180);
+    return () => window.clearTimeout(handle);
+  }, [findQuery, findOpen, pdf.doc, pdf.revision]);
+
+  // Follow the active hit with the viewport.
+  useEffect(() => {
+    const hit = hits[activeHit];
+    if (hit) setJump({ index: hit.page, token: Date.now() });
+  }, [activeHit, hits]);
+
+  const stepHit = useCallback(
+    (delta: number) => {
+      setHits((prevHits) => {
+        if (prevHits.length === 0) return prevHits;
+        setActiveHit((prev) => (prev + delta + prevHits.length) % prevHits.length);
+        return prevHits;
+      });
+    },
+    []
+  );
 
   /* ── Actions ────────────────────────────────────────────────── */
 
@@ -102,6 +182,9 @@ export function App() {
     if (info) {
       setCurrent(0);
       setZoom(1);
+      setFindQuery('');
+      setHits([]);
+      setActiveHit(0);
       notify(t('toast.opened', { name: info.name }));
     }
   }, [notify, pdf, t]);
@@ -145,6 +228,100 @@ export function App() {
     }
   }, [notify, pdf, t]);
 
+  const copySelectedText = useCallback(async () => {
+    if (pdf.selected.length === 0) return;
+    try {
+      const text = await pageText(pdf.selected);
+      if (!text.trim()) {
+        notify(t('toast.noText'), true);
+        return;
+      }
+      await copyText(text);
+      notify(t('toast.copied'));
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    }
+  }, [notify, pdf.selected, t]);
+
+  const applyStamp = useCallback(
+    async (kind: StampKind, text: string, fontSize: number, margin: number, opacity: number) => {
+      const info = await pdf.stamp(kind, text, fontSize, margin, opacity);
+      if (info) notify(t('stamp.done'));
+    },
+    [notify, pdf, t]
+  );
+
+  const exportImages = useCallback(async () => {
+    if (!pdf.doc) return;
+    const dir = await pickDirectory();
+    if (!dir) return;
+    const pages = pdf.selected.length > 0 ? pdf.selected : pdf.doc.pages.map((p) => p.index);
+    try {
+      const results = await exportPageImages(pages, dir, 1600);
+      notify(t('toast.exported', { count: results.length }));
+      if (results[0]) void revealInFinder(results[0].path);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    }
+  }, [notify, pdf, t]);
+
+  const runImagesToPdf = useCallback(async () => {
+    const imagePaths = await pickImages();
+    if (imagePaths.length === 0) return;
+    const target = await pickSavePath('images.pdf');
+    if (!target) return;
+    try {
+      const result = await imagesToPdf(imagePaths, target);
+      notify(t('toast.imagesPdf', { name: fileStem(result.path) + '.pdf' }));
+      void revealInFinder(result.path);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    }
+  }, [notify, t]);
+
+  const applyMarkup = useCallback(
+    async (rect: MarkupRect) => {
+      if (!markupTool || markupTool === 'note' || markupTool === 'sign') return;
+      const color: [number, number, number] =
+        markupTool === 'highlight' ? [255, 235, 59] : [229, 57, 53];
+      const opacity = markupTool === 'highlight' ? 0.35 : 0.9;
+      const info = await pdf.markup(markupTool, rect, color, opacity);
+      if (info) notify(t('markup.done'));
+    },
+    [markupTool, notify, pdf, t]
+  );
+
+  const applyNote = useCallback(
+    async (text: string) => {
+      if (!noteAt) return;
+      const info = await pdf.note(noteAt.page, noteAt.x, noteAt.y, text, [255, 200, 0]);
+      if (info) notify(t('note.done'));
+    },
+    [noteAt, notify, pdf, t]
+  );
+
+  const chooseSignature = useCallback(async () => {
+    const images = await pickImages();
+    if (images.length === 0) return;
+    setSigPath(images[0]);
+    setMarkupTool('sign');
+    notify(t('sign.hint'));
+  }, [notify, t]);
+
+  const handlePageClick = useCallback(
+    async (page: number, x: number, y: number) => {
+      if (markupTool === 'sign') {
+        if (!sigPath) return;
+        const info = await pdf.signature(page, x, y, 160, sigPath);
+        if (info) notify(t('sign.done'));
+        setMarkupTool(null);
+        return;
+      }
+      if (markupTool === 'note') setNoteAt({ page, x, y });
+    },
+    [markupTool, notify, pdf, sigPath, t]
+  );
+
   const selectPage = useCallback((index: number) => {
     setCurrent(index);
     setJump({ index, token: Date.now() });
@@ -172,12 +349,19 @@ export function App() {
         selectedCount={pdf.selected.length}
         zoom={zoom}
         theme={theme}
+        markupTool={markupTool}
+        onMarkupTool={setMarkupTool}
         onOpen={openFile}
         onSave={save}
         onSaveAs={saveAs}
         onMerge={() => setDialog('merge')}
         onSplit={() => setDialog('split')}
         onExtract={extractSelected}
+        onCopyText={copySelectedText}
+        onStamp={() => setDialog('stamp')}
+        onExportImages={exportImages}
+        onImagesToPdf={runImagesToPdf}
+        onSign={chooseSignature}
         onRotate={rotateSelected}
         onDelete={removeSelected}
         onZoom={setZoom}
@@ -194,15 +378,33 @@ export function App() {
             onSelect={selectPage}
             onMove={pdf.move}
           />
-          <PageViewer
-            pages={doc.pages}
-            revision={pdf.revision}
-            zoom={zoom}
-            selected={pdf.selected}
-            jump={jump}
-            onSelect={toggleSelected}
-            onVisible={setCurrent}
-          />
+          <div className="viewer-wrap">
+            <PageViewer
+              pages={doc.pages}
+              revision={pdf.revision}
+              zoom={zoom}
+              selected={pdf.selected}
+              jump={jump}
+              hits={hits}
+              activeHit={activeHit}
+              markupTool={markupTool}
+              onMarkup={(rect) => void applyMarkup(rect)}
+              onNoteAt={handlePageClick}
+              onSelect={toggleSelected}
+              onVisible={setCurrent}
+            />
+            {findOpen ? (
+              <FindBar
+                query={findQuery}
+                hitCount={hits.length}
+                active={activeHit}
+                onQuery={setFindQuery}
+                onPrev={() => stepHit(-1)}
+                onNext={() => stepHit(1)}
+                onClose={() => setFindOpen(false)}
+              />
+            ) : null}
+          </div>
         </div>
       ) : (
         <DropZone onOpen={openFile} dragActive={dragActive} />
@@ -225,6 +427,10 @@ export function App() {
           onRun={pdf.split}
         />
       ) : null}
+      {dialog === 'stamp' && doc ? (
+        <StampDialog onClose={() => setDialog(null)} onRun={applyStamp} />
+      ) : null}
+      {noteAt ? <NoteDialog onClose={() => setNoteAt(null)} onRun={applyNote} /> : null}
 
       {toast ? <div className={`toast${toast.error ? ' error' : ''}`}>{toast.text}</div> : null}
     </div>
