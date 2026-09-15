@@ -99,6 +99,15 @@ export const zh: Strings = {
     done: '已添加标注',
   },
 
+  password: {
+    title: '需要密码',
+    hint: '该 PDF 已加密。',
+    label: '密码',
+    open: '打开',
+    cancel: '取消',
+    wrong: '密码错误，请重试。',
+  },
+
   sign: {
     pick: '选择签名图片',
     hint: '在页面上点击放置签名',

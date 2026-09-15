@@ -18,8 +18,8 @@ import type {
  * Tauri v2 converts these camelCase JS arguments to snake_case Rust parameters.
  */
 
-export async function openDocument(path: string): Promise<DocumentInfo> {
-  return invoke<DocumentInfo>('open_document', { path });
+export async function openDocument(path: string, password?: string): Promise<DocumentInfo> {
+  return invoke<DocumentInfo>('open_document', { path, password: password ?? null });
 }
 
 export async function closeDocument(): Promise<void> {

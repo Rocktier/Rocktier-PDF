@@ -97,6 +97,15 @@ export const en = {
     done: 'Markup added',
   },
 
+  password: {
+    title: 'Password required',
+    hint: 'This PDF is encrypted.',
+    label: 'Password',
+    open: 'Open',
+    cancel: 'Cancel',
+    wrong: 'Wrong password — try again.',
+  },
+
   sign: {
     pick: 'Choose a signature image',
     hint: 'Click on the page to place your signature',

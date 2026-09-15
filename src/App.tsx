@@ -5,6 +5,7 @@ import { FindBar } from './components/FindBar';
 import { MergeDialog } from './components/MergeDialog';
 import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
+import { PasswordDialog } from './components/PasswordDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
 import { StatusBar } from './components/StatusBar';
@@ -52,6 +53,7 @@ export function App() {
   const [markupTool, setMarkupTool] = useState<AnnotTool | null>(null);
   const [noteAt, setNoteAt] = useState<{ page: number; x: number; y: number } | null>(null);
   const [sigPath, setSigPath] = useState<string | null>(null);
+  const [pwPrompt, setPwPrompt] = useState<{ path: string; incorrect: boolean } | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -178,7 +180,7 @@ export function App() {
   const openFile = useCallback(async () => {
     const path = await pickPdf();
     if (!path) return;
-    const info = await pdf.openPath(path);
+    const { info, error } = await pdf.openPathWithResult(path);
     if (info) {
       setCurrent(0);
       setZoom(1);
@@ -186,8 +188,26 @@ export function App() {
       setHits([]);
       setActiveHit(0);
       notify(t('toast.opened', { name: info.name }));
+    } else if (error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT') {
+      setPwPrompt({ path, incorrect: error === 'PASSWORD_INCORRECT' });
     }
   }, [notify, pdf, t]);
+
+  const submitPassword = useCallback(
+    async (password: string) => {
+      if (!pwPrompt) return false;
+      const { info, error } = await pdf.openPathWithResult(pwPrompt.path, password);
+      if (info) {
+        setPwPrompt(null);
+        setCurrent(0);
+        setZoom(1);
+        notify(t('toast.opened', { name: info.name }));
+        return true;
+      }
+      return !(error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT');
+    },
+    [notify, pdf, pwPrompt, t]
+  );
 
   const save = useCallback(async () => {
     const path = await pdf.save();
@@ -431,6 +451,13 @@ export function App() {
         <StampDialog onClose={() => setDialog(null)} onRun={applyStamp} />
       ) : null}
       {noteAt ? <NoteDialog onClose={() => setNoteAt(null)} onRun={applyNote} /> : null}
+      {pwPrompt ? (
+        <PasswordDialog
+          incorrect={pwPrompt.incorrect}
+          onClose={() => setPwPrompt(null)}
+          onSubmit={submitPassword}
+        />
+      ) : null}
 
       {toast ? <div className={`toast${toast.error ? ' error' : ''}`}>{toast.text}</div> : null}
     </div>

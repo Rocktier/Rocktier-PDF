@@ -25,6 +25,7 @@ pub async fn open_document(
     app: AppHandle,
     state: State<'_, AppState>,
     path: String,
+    password: Option<String>,
 ) -> CmdResult<DocumentInfo> {
     let pdfium = init_pdfium(&app)?;
 
@@ -32,8 +33,18 @@ pub async fn open_document(
     // unlocked so "Save" can overwrite the original on Windows.
     let bytes = std::fs::read(&path).map_err(|e| format!("Cannot read file: {e}"))?;
     let document = pdfium
-        .load_pdf_from_byte_vec(bytes, None)
-        .map_err(|e| format!("Cannot open PDF: {e}"))?;
+        .load_pdf_from_byte_vec(bytes, password.as_deref())
+        .map_err(|e| match e {
+            // Typed sentinels the frontend matches on to raise a password prompt.
+            PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
+                if password.is_some() {
+                    "PASSWORD_INCORRECT".to_string()
+                } else {
+                    "PASSWORD_REQUIRED".to_string()
+                }
+            }
+            other => format!("Cannot open PDF: {other}"),
+        })?;
 
     if document.pages().len() == 0 {
         return Err("This PDF has no pages.".to_string());

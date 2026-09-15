@@ -72,12 +72,34 @@ export function usePdf() {
   }, []);
 
   const openPath = useCallback(
-    async (path: string) => {
-      const info = await run(() => openDocument(path));
+    async (path: string, password?: string) => {
+      const info = await run(() => openDocument(path, password));
       if (info) applyDoc(info);
       return info;
     },
     [applyDoc, run]
+  );
+
+  /**
+   * Like [openPath], but returns the error string instead of swallowing it, so
+   * the caller can distinguish a password prompt from a real failure.
+   */
+  const openPathWithResult = useCallback(
+    async (path: string, password?: string) => {
+      setBusy(true);
+      try {
+        const info = await openDocument(path, password);
+        applyDoc(info);
+        return { info, error: null as string | null };
+      } catch (e) {
+        const message = typeof e === 'string' ? e : e instanceof Error ? e.message : String(e);
+        setError(message);
+        return { info: null, error: message };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [applyDoc]
   );
 
   const close = useCallback(async () => {
@@ -198,6 +220,7 @@ export function usePdf() {
     selected,
     setSelected,
     openPath,
+    openPathWithResult,
     close,
     save,
     saveAs,
