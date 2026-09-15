@@ -16,6 +16,7 @@ export const zh: Strings = {
     delete: '删除',
     close: '关闭',
     theme: '主题',
+    language: '语言',
   },
 
   empty: {
@@ -48,6 +49,9 @@ export const zh: Strings = {
     cancel: '取消',
     run: '合并',
     done: '已合并为 {name}',
+    needTwo: '至少选择两个 PDF 才能合并',
+    needOutput: '请选择合并后的保存位置',
+    failed: '合并失败',
   },
 
   split: {
@@ -63,6 +67,8 @@ export const zh: Strings = {
     cancel: '取消',
     run: '拆分',
     done: '已生成 {count} 个文件',
+    needOutput: '请选择输出文件夹',
+    failed: '没有生成任何文件，请检查页面范围',
   },
 
   zoom: {

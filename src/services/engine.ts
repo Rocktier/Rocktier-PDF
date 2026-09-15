@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import type { DocumentInfo, PageInfo, PathResult, RenderedPage, SplitMode } from '../types';
+import type { DocumentInfo, PathResult, RenderedPage, SplitMode } from '../types';
 
 /**
  * Every backend call goes through this module. Components never import
@@ -11,10 +11,6 @@ import type { DocumentInfo, PageInfo, PathResult, RenderedPage, SplitMode } from
 
 export async function openDocument(path: string): Promise<DocumentInfo> {
   return invoke<DocumentInfo>('open_document', { path });
-}
-
-export async function getDocument(): Promise<DocumentInfo | null> {
-  return invoke<DocumentInfo | null>('get_document');
 }
 
 export async function closeDocument(): Promise<void> {
@@ -103,19 +99,9 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-/** Alias kept because the UI reads more naturally with "size". */
-export function formatSize(bytes: number): string {
-  return formatBytes(bytes);
-}
-
 /** `C:\docs\Report.pdf` → `Report`. Uses the last separator, so it works on
  *  both Windows and POSIX paths as they arrive from the native dialogs. */
 export function fileStem(path: string): string {
   const name = path.split(/[\\/]/).pop() ?? path;
   return name.replace(/\.pdf$/i, '');
-}
-
-/** Human-readable page label, 1-based. */
-export function pageLabel(page: PageInfo): string {
-  return String(page.index + 1);
 }

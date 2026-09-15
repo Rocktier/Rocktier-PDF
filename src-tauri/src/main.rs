@@ -13,7 +13,6 @@ fn main() {
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::open_document,
-            commands::get_document,
             commands::close_document,
             commands::render_page,
             commands::delete_pages,

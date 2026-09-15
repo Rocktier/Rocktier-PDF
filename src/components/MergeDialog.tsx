@@ -18,7 +18,7 @@ export function MergeDialog({ onClose, onRun }: MergeDialogProps) {
 
   const add = async () => {
     const picked = await pickPdfs();
-    if (!picked || picked.length === 0) return;
+    if (picked.length === 0) return;
     setFiles((prev) => [...prev, ...picked]);
     setError(null);
   };
@@ -31,11 +31,11 @@ export function MergeDialog({ onClose, onRun }: MergeDialogProps) {
 
   const run = async () => {
     if (files.length < 2) {
-      setError('Pick at least two PDFs to merge');
+      setError(t('merge.needTwo'));
       return;
     }
     if (!output) {
-      setError('Choose where to save the merged file');
+      setError(t('merge.needOutput'));
       return;
     }
     setBusy(true);
@@ -43,7 +43,7 @@ export function MergeDialog({ onClose, onRun }: MergeDialogProps) {
     const result = await onRun(files, output);
     setBusy(false);
     if (result) onClose();
-    else setError('Merge failed');
+    else setError(t('merge.failed'));
   };
 
   return (

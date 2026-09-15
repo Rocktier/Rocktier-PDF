@@ -1,4 +1,4 @@
-import { useT } from '../i18n';
+import { useI18n, useT } from '../i18n';
 import type { DocumentInfo } from '../types';
 import {
   IconExtract,
@@ -54,6 +54,7 @@ export function Toolbar({
   onToggleTheme,
 }: ToolbarProps) {
   const t = useT();
+  const { lang, setLang } = useI18n();
   const hasSelection = selectedCount > 0;
 
   const stepZoom = (direction: 1 | -1) => {
@@ -133,6 +134,14 @@ export function Toolbar({
       </button>
 
       <div className="toolbar-sep" />
+
+      <button
+        className="btn btn-icon lang-toggle"
+        onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+        title={t('toolbar.language')}
+      >
+        {lang === 'en' ? 'EN' : '中'}
+      </button>
 
       <button className="btn btn-icon" onClick={onToggleTheme} title={t('toolbar.theme')}>
         {theme === 'dark' ? <IconSun /> : <IconMoon />}

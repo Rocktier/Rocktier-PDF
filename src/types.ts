@@ -43,5 +43,3 @@ export type SplitMode =
   | { kind: 'everyN'; n: number }
   /** Explicit page ranges, e.g. "1-3,5,8-". */
   | { kind: 'ranges'; ranges: string };
-
-export type BusyState = 'idle' | 'busy' | 'error';

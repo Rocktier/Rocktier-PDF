@@ -7,10 +7,9 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  width?: number;
 }
 
-export function Modal({ title, onClose, children, footer, width }: ModalProps) {
+export function Modal({ title, onClose, children, footer }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -21,11 +20,7 @@ export function Modal({ title, onClose, children, footer, width }: ModalProps) {
 
   return (
     <div className="overlay" onMouseDown={onClose}>
-      <div
-        className="modal"
-        style={width ? { width: `min(${width}px, 92vw)` } : undefined}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button className="btn btn-icon" onClick={onClose} aria-label="Close">

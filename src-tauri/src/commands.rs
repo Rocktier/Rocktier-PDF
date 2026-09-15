@@ -1,8 +1,8 @@
 //! Tauri command surface.
 //!
 //! All commands are `async` so long-running Pdfium work never blocks the UI
-//! thread. Errors are flattened to `String` and mapped to i18n keys on the
-//! frontend.
+//! thread. Errors are flattened to English strings and shown as-is in the
+//! status bar — v0.1 has no error-code mapping layer.
 
 use std::path::PathBuf;
 
@@ -48,15 +48,6 @@ pub async fn open_document(
     });
 
     Ok(info)
-}
-
-#[tauri::command]
-pub async fn get_document(state: State<'_, AppState>) -> CmdResult<Option<DocumentInfo>> {
-    let guard = state.doc.lock().map_err(|e| e.to_string())?;
-    match guard.as_ref() {
-        Some(d) => Ok(Some(doc_info(&d.document, &d.path, d.dirty)?)),
-        None => Ok(None),
-    }
 }
 
 #[tauri::command]
@@ -370,9 +361,10 @@ pub async fn reveal_in_finder(path: String) -> CmdResult<()> {
 
     #[cfg(target_os = "windows")]
     {
+        // Explorer wants `/select,<path>` as a single argument; splitting it
+        // across two makes it open the default folder instead of selecting.
         std::process::Command::new("explorer")
-            .arg("/select,")
-            .arg(&path)
+            .arg(format!("/select,{path}"))
             .spawn()
             .map_err(|e| e.to_string())?;
     }

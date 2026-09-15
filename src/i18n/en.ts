@@ -14,6 +14,7 @@ export const en = {
     delete: 'Delete',
     close: 'Close',
     theme: 'Theme',
+    language: 'Language',
   },
 
   empty: {
@@ -46,6 +47,9 @@ export const en = {
     cancel: 'Cancel',
     run: 'Merge',
     done: 'Merged into {name}',
+    needTwo: 'Pick at least two PDFs to merge',
+    needOutput: 'Choose where to save the merged file',
+    failed: 'Merge failed',
   },
 
   split: {
@@ -61,6 +65,8 @@ export const en = {
     cancel: 'Cancel',
     run: 'Split',
     done: 'Created {count} files',
+    needOutput: 'Choose an output folder',
+    failed: 'Nothing was written — check the page range',
   },
 
   zoom: {

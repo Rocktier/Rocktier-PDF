@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DragEvent } from 'react';
 import { useT } from '../i18n';
-import { clearRenderCache, getCached, getRender } from '../services/renderCache';
+import { getCached, getRender } from '../services/renderCache';
 import type { PageInfo, RenderedPage } from '../types';
 import { devicePixelRatioCapped, displaySize } from '../utils';
 import { useInView } from '../hooks/useInView';
@@ -145,6 +145,3 @@ function Thumb({
     </div>
   );
 }
-
-/** Exposed so App can drop the cache when a document closes. */
-export { clearRenderCache };

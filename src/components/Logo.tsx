@@ -130,18 +130,6 @@ export const IconClose = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
-export const IconChevronUp = ({ size = 16 }: IconProps) => (
-  <svg {...base(size)}>
-    <path d="M4 10l4-4 4 4" />
-  </svg>
-);
-
-export const IconChevronDown = ({ size = 16 }: IconProps) => (
-  <svg {...base(size)}>
-    <path d="M4 6l4 4 4-4" />
-  </svg>
-);
-
 export const IconMoon = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M13 9.7A5.5 5.5 0 0 1 6.3 3a5.5 5.5 0 1 0 6.7 6.7Z" />

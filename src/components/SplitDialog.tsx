@@ -34,7 +34,7 @@ export function SplitDialog({ pageCount, onClose, onRun }: SplitDialogProps) {
 
   const run = async () => {
     if (!output) {
-      setError('Choose an output folder');
+      setError(t('split.needOutput'));
       return;
     }
     setBusy(true);
@@ -42,7 +42,7 @@ export function SplitDialog({ pageCount, onClose, onRun }: SplitDialogProps) {
     const paths = await onRun(output, buildMode());
     setBusy(false);
     if (paths.length > 0) onClose();
-    else setError('Nothing was written');
+    else setError(t('split.failed'));
   };
 
   return (

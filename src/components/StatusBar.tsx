@@ -1,5 +1,5 @@
 import { useT } from '../i18n';
-import { formatSize } from '../services/engine';
+import { formatBytes } from '../services/engine';
 import type { DocumentInfo } from '../types';
 
 interface StatusBarProps {
@@ -29,7 +29,7 @@ export function StatusBar({ doc, busy, error, selectedCount }: StatusBarProps) {
             {doc.pageCount} {t('status.pages')}
           </span>
           <span className="sep">|</span>
-          <span>{formatSize(doc.fileSize)}</span>
+          <span>{formatBytes(doc.fileSize)}</span>
           {selectedCount > 0 ? (
             <>
               <span className="sep">|</span>

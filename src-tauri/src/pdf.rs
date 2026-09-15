@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn rotation_is_persisted_on_the_page() {
         let pdfium = engine();
-        let mut doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(&pdfium);
 
         let mut page = doc.pages().get(1).expect("page 1");
         assert_eq!(page.rotation().map(degrees_of).unwrap_or(0), 0);
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn deleting_and_copying_pages_works() {
         let pdfium = engine();
-        let mut doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(&pdfium);
 
         doc.pages().get(0).expect("page").delete().expect("delete");
         assert_eq!(doc.pages().len(), 2);

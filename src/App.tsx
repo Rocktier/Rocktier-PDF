@@ -128,10 +128,10 @@ export function App() {
   const rotateSelected = useCallback(
     async (degrees: number) => {
       const count = pdf.selected.length || 1;
-      await pdf.rotate(degrees);
+      await pdf.rotate(degrees, current);
       notify(t('toast.rotated', { count }));
     },
-    [notify, pdf, t]
+    [current, notify, pdf, t]
   );
 
   const extractSelected = useCallback(async () => {

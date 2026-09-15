@@ -118,7 +118,7 @@ function Page({
     <div
       ref={ref}
       className={`page${selected ? ' selected' : ''}`}
-      style={{ width: cssWidth, height: rendered ? cssHeight : cssHeight }}
+      style={{ width: cssWidth, height: cssHeight }}
       onClick={() => onSelect(position)}
     >
       {rendered ? (

@@ -24,7 +24,3 @@ export function displaySize(page: PageInfo, zoom: number): { width: number; heig
 export function renderWidth(page: PageInfo, zoom: number): number {
   return Math.round(displaySize(page, zoom).width * devicePixelRatioCapped());
 }
-
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}

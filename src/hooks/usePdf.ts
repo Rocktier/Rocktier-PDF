@@ -11,6 +11,7 @@ import {
   splitDocument,
 } from '../services/engine';
 import { clearRenderCache } from '../services/renderCache';
+import { fileStem } from '../services/engine';
 import type { DocumentInfo, SplitMode } from '../types';
 
 /**
@@ -43,6 +44,7 @@ export function usePdf() {
     }
   }, []);
 
+  /** Adopt a document returned by a backend mutation. */
   const applyDoc = useCallback((next: DocumentInfo) => {
     clearRenderCache();
     setDoc(next);
@@ -50,18 +52,28 @@ export function usePdf() {
     setRevision((r) => r + 1);
   }, []);
 
+  /** Keep the header in sync after the file was written under a new path. */
+  const adoptSaved = useCallback((result: { path: string; size: number }) => {
+    setDoc((prev) =>
+      prev
+        ? {
+            ...prev,
+            path: result.path,
+            name: `${fileStem(result.path)}.pdf`,
+            fileSize: result.size,
+            dirty: false,
+          }
+        : prev
+    );
+  }, []);
+
   const openPath = useCallback(
     async (path: string) => {
       const info = await run(() => openDocument(path));
-      if (info) {
-        clearRenderCache();
-        setDoc(info);
-        setSelected([]);
-        setRevision((r) => r + 1);
-      }
+      if (info) applyDoc(info);
       return info;
     },
-    [run]
+    [applyDoc, run]
   );
 
   const close = useCallback(async () => {
@@ -74,17 +86,17 @@ export function usePdf() {
 
   const save = useCallback(async () => {
     const result = await run(() => saveDocument(null));
-    if (result && doc) setDoc({ ...doc, path: result.path, dirty: false });
+    if (result) adoptSaved(result);
     return result?.path ?? null;
-  }, [doc, run]);
+  }, [adoptSaved, run]);
 
   const saveAs = useCallback(
     async (path: string) => {
       const result = await run(() => saveDocument(path));
-      if (result && doc) setDoc({ ...doc, path: result.path, dirty: false });
+      if (result) adoptSaved(result);
       return result?.path ?? null;
     },
-    [doc, run]
+    [adoptSaved, run]
   );
 
   const removePages = useCallback(async () => {
@@ -93,9 +105,10 @@ export function usePdf() {
     if (info) applyDoc(info);
   }, [applyDoc, run, selected]);
 
+  /** With nothing selected, rotate the page the user is actually looking at. */
   const rotate = useCallback(
-    async (degrees: number) => {
-      const target = selected.length > 0 ? selected : doc ? [0] : [];
+    async (degrees: number, fallbackIndex = 0) => {
+      const target = selected.length > 0 ? selected : doc ? [fallbackIndex] : [];
       if (target.length === 0) return;
       const info = await run(() => rotatePages(target, degrees));
       if (info) applyDoc(info);
