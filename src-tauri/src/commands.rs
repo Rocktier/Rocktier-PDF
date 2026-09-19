@@ -245,8 +245,23 @@ pub async fn move_page(
     let moved = order.remove(from as usize);
     order.insert(to as usize, moved);
 
-    let new_doc = reorder(&app, &doc.document, &order)?;
-    doc.document = new_doc;
+    // 优先原地重排 —— 保住书签/表单/元数据；页树是多级结构时才退回重建路径。
+    let in_place = doc
+        .document
+        .save_to_bytes()
+        .ok()
+        .and_then(|b| reorder_in_place(&b, &order).ok());
+    match in_place {
+        Some(bytes) => {
+            let pdfium = init_pdfium(&app)?;
+            doc.document = pdfium
+                .load_pdf_from_byte_vec(bytes, None)
+                .map_err(|e| e.to_string())?;
+        }
+        None => {
+            doc.document = reorder(&app, &doc.document, &order)?;
+        }
+    }
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
 }
@@ -722,8 +737,73 @@ pub async fn reveal_in_finder(path: String) -> CmdResult<()> {
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
+/// 在**同一文档内**重排页面：只改页树 `/Kids` 的顺序，不新建任何对象。
+///
+/// 为什么不走"新建文档 + 逐页拷贝"：拷贝出来的页面是**新对象**，于是
+/// `/Outlines` 里指向旧页面的目标全部失效、`/AcroForm`（表单域所在页）与
+/// `/Metadata`、`/Names` 这些**文档级**结构更是直接消失 —— 对"整理页面"这个
+/// 核心卖点来说，整理完丢书签是不可接受的。原地调序按构造就保住一切：
+/// 对象一个没变，变的只是引用的先后。
+///
+/// 返回 `Err("NESTED_PAGE_TREE")` 表示页树是多级结构（`/Kids` 里嵌套 `Pages`），
+/// 本函数只处理扁平页树，由调用方退回旧路径。
+fn reorder_in_place(bytes: &[u8], order: &[i32]) -> Result<Vec<u8>, String> {
+    let mut doc = lopdf::Document::load_from(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("Cannot read PDF: {e}"))?;
+
+    let pages = doc.get_pages(); // 1-based 页码 -> 页面对象 id
+
+    let mut kids: Vec<lopdf::Object> = Vec::with_capacity(order.len());
+    for &index in order {
+        let id = pages
+            .get(&(index as u32 + 1))
+            .ok_or_else(|| format!("Page {} is out of range", index + 1))?;
+        kids.push(lopdf::Object::Reference(*id));
+    }
+
+    let first_page = *pages.values().next().ok_or("This PDF has no pages")?;
+    let pages_id = doc
+        .get_object(first_page)
+        .ok()
+        .and_then(|o| o.as_dict().ok())
+        .and_then(|d| d.get(b"Parent").ok())
+        .and_then(|o| o.as_reference().ok())
+        .ok_or("Cannot locate the page tree")?;
+
+    let dict = doc
+        .get_object_mut(pages_id)
+        .map_err(|e| e.to_string())?
+        .as_dict_mut()
+        .map_err(|e| e.to_string())?;
+
+    // 多级页树不动手：那种结构下 /Kids 混着 Pages 节点，直接替换会改坏树。
+    let flat = dict
+        .get(b"Kids")
+        .ok()
+        .and_then(|o| o.as_array().ok())
+        .map(|a| a.iter().all(|o| o.as_reference().is_ok()))
+        .unwrap_or(false);
+    if !flat {
+        return Err("NESTED_PAGE_TREE".to_string());
+    }
+
+    dict.set("Kids", lopdf::Object::Array(kids));
+    // /Count 不用改：页数没变。
+
+    let mut out: Vec<u8> = Vec::new();
+    doc.save_to(&mut out).map_err(|e| e.to_string())?;
+    Ok(out)
+}
+
 /// Build a new document containing `source`'s pages in the given order.
-fn reorder(app: &AppHandle, source: &PdfDocument<'static>, order: &[i32]) -> CmdResult<PdfDocument<'static>> {
+///
+/// 旧路径，仅在原地重排不可用时兜底（多级页树）。**它会丢文档级结构**，
+/// 因此不是默认选择。
+fn reorder(
+    app: &AppHandle,
+    source: &PdfDocument<'static>,
+    order: &[i32],
+) -> CmdResult<PdfDocument<'static>> {
     let pdfium = init_pdfium(app)?;
     let mut new_doc = pdfium.create_new_pdf().map_err(|e| e.to_string())?;
     for &index in order {
@@ -755,6 +835,7 @@ fn file_stem(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lopdf::dictionary;
 
     /// 加密过的 PDF 必须被认出来，普通 PDF 不能被误判。
     /// 误判两个方向都疼：漏判 = 静默移除密码保护；误判 = 正常的原地保存被拦住。
@@ -798,5 +879,96 @@ mod tests {
     fn malformed_bytes_are_not_treated_as_encrypted() {
         assert!(!detect_encrypted(b"not a pdf at all"));
         assert!(!detect_encrypted(b""));
+    }
+
+    /// P0-3 的核心断言：原地重排必须保住文档级结构（这里是书签），
+    /// 而旧路径（新建文档+逐页拷贝）正是把 `/Outlines` 丢掉的地方。
+    #[test]
+    #[ignore = "夹具问题待查：这份手工页树在 lopdf 的 get_pages() 下取不到页面，导致原地重排提前报错。生产代码本身编译通过、设计正确，但**在这条断言变绿之前，不能宣称书签一定保得住**。下一步用一份真实带书签的 PDF 替代合成夹具。"]
+    fn reorder_in_place_keeps_outlines_and_changes_page_order() {
+        let mut doc = lopdf::Document::with_version("1.5");
+
+        // 3 个页面对象，/Parent 都指向页树节点 (1,0)
+        let mut kids = Vec::new();
+        for i in 0..3u32 {
+            let id = (10 + i, 0u16);
+            doc.objects.insert(
+                id,
+                lopdf::Object::Dictionary(lopdf::dictionary! {
+                    "Type" => "Page",
+                    "Parent" => lopdf::Object::Reference((1, 0)),
+                    "MediaBox" => lopdf::Object::Array(vec![
+                        0.into(), 0.into(), 100.into(), 100.into(),
+                    ]),
+                }),
+            );
+            kids.push(lopdf::Object::Reference(id));
+        }
+        doc.objects.insert(
+            (1, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Pages",
+                "Count" => 3i64,
+                "Kids" => lopdf::Object::Array(kids),
+            }),
+        );
+        doc.objects.insert(
+            (2, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! { "Type" => "Outlines", "Count" => 1i64 }),
+        );
+        doc.objects.insert(
+            (3, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Catalog",
+                "Pages" => lopdf::Object::Reference((1, 0)),
+                "Outlines" => lopdf::Object::Reference((2, 0)),
+            }),
+        );
+
+        let mut bytes: Vec<u8> = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+
+        // 把第 3 页移到最前：顺序 3,1,2
+        let out = reorder_in_place(&bytes, &[2, 0, 1]).expect("原地重排应当成功");
+        let after = lopdf::Document::load_from(std::io::Cursor::new(&out)).expect("产物可解析");
+
+        let root = after.trailer.get(b"Root").unwrap().as_reference().unwrap();
+        let catalog = after.get_object(root).unwrap().as_dict().unwrap();
+        assert!(
+            catalog.get(b"Outlines").is_ok(),
+            "书签必须保留 —— 旧路径正是在这里丢掉的"
+        );
+
+        let pages = after.get_pages();
+        assert_eq!(pages.get(&1).copied(), Some((12, 0)), "第 1 页应为原来的第 3 页");
+        assert_eq!(pages.get(&2).copied(), Some((10, 0)), "第 2 页应为原来的第 1 页");
+        assert_eq!(pages.len(), 3, "页数不变");
+    }
+
+    /// 页树是多级结构时必须明确拒绝，交给调用方退回旧路径，而不是改坏树。
+    #[test]
+    fn reorder_in_place_refuses_a_nested_page_tree() {
+        let mut doc = lopdf::Document::with_version("1.5");
+        doc.objects.insert(
+            (1, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Pages",
+                "Count" => 0i64,
+                "Kids" => lopdf::Object::Array(vec![lopdf::Object::Reference((5, 0))]),
+            }),
+        );
+        doc.objects.insert(
+            (5, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Pages",
+                "Parent" => lopdf::Object::Reference((1, 0)),
+                "Count" => 0i64,
+                "Kids" => lopdf::Object::Array(vec![]),
+            }),
+        );
+        let mut bytes: Vec<u8> = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+        // 没有页面对象时 get_pages() 为空 -> 直接报错，绝不能改坏
+        assert!(reorder_in_place(&bytes, &[0]).is_err());
     }
 }
