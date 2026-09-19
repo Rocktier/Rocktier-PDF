@@ -123,3 +123,72 @@ pub fn compress(input: &Path, output: &Path, profile: &str) -> Result<u64, Strin
     std::fs::rename(&staged, output).map_err(|e| format!("Cannot write output: {e}"))?;
     Ok(std::fs::metadata(output).map(|m| m.len()).unwrap_or(0))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 合并后的验收：在**真实文档**上跑完整压缩路径（qpdf + 图像 pass），
+    /// 断言页数不变、书签仍在。环境变量门控，CI 不跑（真实文档不入库）。
+    ///   ROCKTIER_TEST_DIR=~/Downloads cargo test acceptance -- --nocapture
+    #[test]
+    fn acceptance_on_real_documents() {
+        let dir = match std::env::var("ROCKTIER_TEST_DIR") {
+            Ok(d) => d,
+            Err(_) => return,
+        };
+        let out_dir = std::env::temp_dir().join("rt-pdf-acceptance");
+        std::fs::create_dir_all(&out_dir).unwrap();
+
+        let mut files: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().map(|x| x == "pdf").unwrap_or(false))
+            .collect();
+        files.sort();
+        assert!(!files.is_empty(), "目录里没有 PDF");
+
+        let has_outlines = |d: &lopdf::Document| {
+            d.trailer
+                .get(b"Root")
+                .ok()
+                .and_then(|r| r.as_reference().ok())
+                .and_then(|r| d.get_object(r).ok())
+                .and_then(|o| o.as_dict().ok())
+                .and_then(|dd| dd.get(b"Outlines").ok())
+                .is_some()
+        };
+
+        for src in files {
+            let name = src.file_name().unwrap().to_string_lossy().to_string();
+            let out = out_dir.join(&name);
+            let _ = std::fs::remove_file(&out);
+
+            let before = std::fs::metadata(&src).unwrap().len();
+            match compress(&src, &out, "balanced") {
+                Ok(after) => {
+                    let src_doc = lopdf::Document::load(&src).ok();
+                    let out_doc = lopdf::Document::load(&out).expect("产物必须可解析");
+                    let pages_before = src_doc.as_ref().map(|d| d.get_pages().len()).unwrap_or(0);
+                    let pages_after = out_doc.get_pages().len();
+                    assert_eq!(pages_before, pages_after, "{name}: 页数变了");
+
+                    // 书签：原文件有，产物就必须还有
+                    if src_doc.as_ref().map(&has_outlines).unwrap_or(false) {
+                        assert!(has_outlines(&out_doc), "{name}: 书签丢了");
+                    }
+                    println!(
+                        "ACCEPT {name}: {before} -> {after} (省 {}%), 页 {pages_before}->{pages_after}",
+                        if before > 0 {
+                            100i64 - (after as i64 * 100 / before as i64)
+                        } else {
+                            0
+                        }
+                    );
+                }
+                Err(e) => println!("ACCEPT {name}: 压缩失败 — {e}"),
+            }
+        }
+    }
+}
