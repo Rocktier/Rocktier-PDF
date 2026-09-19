@@ -18,6 +18,17 @@ use crate::state::{AppState, OpenDoc};
 
 type CmdResult<T> = Result<T, String>;
 
+/// 这份 PDF 是否带密码保护。
+///
+/// pdfium 不提供该信息，也不写加密，所以在打开时用 lopdf 读一次 trailer 的
+/// `/Encrypt` 记下来。解析失败一律当作"没有"——这个判断只用于保存时拦截原地
+/// 覆盖，不该因为一个畸形文件就让正常保存也失败。
+fn detect_encrypted(bytes: &[u8]) -> bool {
+    lopdf::Document::load_from(std::io::Cursor::new(bytes))
+        .map(|d| d.trailer.get(b"Encrypt").is_ok())
+        .unwrap_or(false)
+}
+
 /* ── Lifecycle ───────────────────────────────────────────────────── */
 
 #[tauri::command]
@@ -32,6 +43,8 @@ pub async fn open_document(
     // Load from bytes rather than a file handle: it keeps the source file
     // unlocked so "Save" can overwrite the original on Windows.
     let bytes = std::fs::read(&path).map_err(|e| format!("Cannot read file: {e}"))?;
+    // 在 bytes 被 move 进 pdfium 之前先判断这份文件是否带密码保护。
+    let was_encrypted = detect_encrypted(&bytes);
     let document = pdfium
         .load_pdf_from_byte_vec(bytes, password.as_deref())
         .map_err(|e| match e {
@@ -46,7 +59,7 @@ pub async fn open_document(
             other => format!("Cannot open PDF: {other}"),
         })?;
 
-    if document.pages().len() == 0 {
+    if document.pages().is_empty() {
         return Err("This PDF has no pages.".to_string());
     }
 
@@ -56,6 +69,7 @@ pub async fn open_document(
     *guard = Some(OpenDoc {
         document,
         path,
+        was_encrypted,
         dirty: false,
         undo: Vec::new(),
         redo: Vec::new(),
@@ -255,6 +269,15 @@ pub async fn save_document(
         None => {
             if doc.path.is_empty() {
                 return Err("No destination path".to_string());
+            }
+            // 原地覆盖 = 用 pdfium 重写原文件，而 pdfium 不写加密。
+            // 对加密文档来说那不是"保存"，是"静默移除密码保护"。宁可拒绝也不做。
+            if doc.was_encrypted {
+                return Err(
+                    "ENCRYPTED_IN_PLACE_BLOCKED: this document is password-protected, and \
+                     saving over it would remove the password. Use Save As to write a copy."
+                        .to_string(),
+                );
             }
             doc.path.clone()
         }
@@ -727,4 +750,53 @@ fn file_stem(path: &str) -> String {
         .map(|s| s.to_string_lossy().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "document".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 加密过的 PDF 必须被认出来，普通 PDF 不能被误判。
+    /// 误判两个方向都疼：漏判 = 静默移除密码保护；误判 = 正常的原地保存被拦住。
+    #[test]
+    fn detects_encryption_without_false_positives() {
+        let dir = std::env::temp_dir().join(format!("rt-editor-enc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let plain = dir.join("plain.pdf");
+        let locked = dir.join("locked.pdf");
+
+        // 造一份最小 PDF：本测试只需要"lopdf 能读它"
+        let mut doc = lopdf::Document::with_version("1.5");
+        doc.objects.insert(
+            (1, 0),
+            lopdf::Object::Dictionary(lopdf::dictionary! { "Type" => "Catalog" }),
+        );
+        doc.save(&plain).unwrap();
+
+        assert!(
+            !detect_encrypted(&std::fs::read(&plain).unwrap()),
+            "普通 PDF 不能被判成加密文档"
+        );
+
+        crate::security::set_password(
+            plain.to_str().unwrap(),
+            locked.to_str().unwrap(),
+            "user-pw",
+            "owner-pw",
+        )
+        .expect("encrypt");
+        assert!(
+            detect_encrypted(&std::fs::read(&locked).unwrap()),
+            "加密 PDF 必须被认出来，否则原地保存会静默抹掉密码"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 随手给一段垃圾字节：不能 panic，也不能判成加密。
+    #[test]
+    fn malformed_bytes_are_not_treated_as_encrypted() {
+        assert!(!detect_encrypted(b"not a pdf at all"));
+        assert!(!detect_encrypted(b""));
+    }
 }

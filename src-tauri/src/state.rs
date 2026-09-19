@@ -13,6 +13,13 @@ pub struct OpenDoc {
     /// `'static` because it borrows the process-wide `Pdfium` instance.
     pub document: PdfDocument<'static>,
     pub path: String,
+    /// Whether the file carried password protection when we opened it.
+    ///
+    /// pdfium does not tell us, and it never writes encryption back out. Without
+    /// this flag, "save" on a protected document quietly produced an unprotected
+    /// file — the user believes their file still has its password, and it does
+    /// not. Recorded once at open time by reading the trailer with lopdf.
+    pub was_encrypted: bool,
     pub dirty: bool,
     /// Byte snapshots taken before each mutation (newest last).
     pub undo: Vec<Vec<u8>>,
