@@ -10,9 +10,20 @@
  *   node scripts/fetch-pdfium.mjs              # current platform only
  *   node scripts/fetch-pdfium.mjs --all        # every supported platform
  *   node scripts/fetch-pdfium.mjs --force      # re-download even if present
+ *   node scripts/fetch-pdfium.mjs --build=<n>  # a specific upstream build
  *
  * Offline note: this is the ONLY step that touches the network, and it runs at
  * build time — never at app runtime. Once bundled, the app is 100% offline.
+ *
+ * The upstream build is pinned (see `PDFIUM_BUILD`) instead of being read from
+ * `releases/latest`. That endpoint is `api.github.com`, where requests without
+ * an Authorization header are capped at 60/hour *per source IP* — and every
+ * GitHub-hosted runner shares an egress IP with everyone else, so CI failed
+ * intermittently with `HTTP 403`. The release *download* URLs live on
+ * github.com rather than api.github.com and are not limited that way, so
+ * building the URL ourselves removes the failure mode entirely. It also fixes
+ * a second problem: upstream cuts a new build every Monday, so "latest" meant
+ * the same commit could produce different binaries from one week to the next.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -29,37 +40,34 @@ const OUT_ROOT = join(ROOT, 'src-tauri', 'resources', 'pdfium');
 
 /** Tauri target triples we ship for. */
 const TARGETS = {
-  'windows-x64': { host: 'win32', arch: 'x64', asset: /^pdfium-win-x64\.tgz$/, file: 'pdfium.dll' },
-  'macos-arm64': { host: 'darwin', arch: 'arm64', asset: /^pdfium-mac-arm64\.tgz$/, file: 'libpdfium.dylib' },
-  'macos-x64': { host: 'darwin', arch: 'x64', asset: /^pdfium-mac-x64\.tgz$/, file: 'libpdfium.dylib' },
-  'linux-x64': { host: 'linux', arch: 'x64', asset: /^pdfium-linux-x64\.tgz$/, file: 'libpdfium.so' },
+  'windows-x64': { host: 'win32', arch: 'x64', asset: 'pdfium-win-x64.tgz', file: 'pdfium.dll' },
+  'macos-arm64': { host: 'darwin', arch: 'arm64', asset: 'pdfium-mac-arm64.tgz', file: 'libpdfium.dylib' },
+  'macos-x64': { host: 'darwin', arch: 'x64', asset: 'pdfium-mac-x64.tgz', file: 'libpdfium.dylib' },
+  'linux-x64': { host: 'linux', arch: 'x64', asset: 'pdfium-linux-x64.tgz', file: 'libpdfium.so' },
 };
 
-const API = 'https://api.github.com/repos/bblanchon/pdfium-binaries/releases/latest';
+/**
+ * The upstream Pdfium build this project ships. Upstream tags builds as
+ * `chromium/<build>`, where <build> is the Chromium revision.
+ *
+ * Bumping this is a deliberate act rather than something CI does behind our
+ * back: pick a build from
+ * https://github.com/bblanchon/pdfium-binaries/releases, run this script with
+ * `--build=<n> --force`, run the test suite against the result, and only then
+ * change this constant.
+ */
+const PDFIUM_BUILD = '8057';
 
-function httpsGet(url, redirects = 0) {
-  return new Promise((ok, fail) => {
-    const req = get(
-      url,
-      { headers: { 'User-Agent': 'rocktier-pdf-editor', Accept: 'application/vnd.github+json' } },
-      (res) => {
-        const { statusCode, headers } = res;
-        if (statusCode >= 300 && statusCode < 400 && headers.location && redirects < 5) {
-          res.resume();
-          return httpsGet(headers.location, redirects + 1).then(ok, fail);
-        }
-        if (statusCode !== 200) {
-          res.resume();
-          return fail(new Error(`HTTP ${statusCode} for ${url}`));
-        }
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => ok(Buffer.concat(chunks)));
-      }
-    );
-    req.on('error', fail);
-    req.setTimeout(30000, () => req.destroy(new Error('timeout')));
-  });
+/**
+ * Download URL for one asset of a given upstream build. No API call involved.
+ *
+ * Upstream does not publish checksums for these archives, so unlike
+ * `provision-qpdf-windows.ps1` there is no hash to verify against. What guards
+ * the contents is that extraction fails loudly on a truncated download, and
+ * `findLib` fails if the archive turns out to hold no Pdfium library.
+ */
+function assetUrl(build, asset) {
+  return `https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/${build}/${asset}`;
 }
 
 function download(url, dest) {
@@ -98,7 +106,7 @@ async function findLib(dir, filename) {
   return null;
 }
 
-async function fetchTarget(key, release, force) {
+async function fetchTarget(key, build, force) {
   const t = TARGETS[key];
   const destDir = join(OUT_ROOT, key);
   const destFile = join(destDir, t.file);
@@ -112,13 +120,10 @@ async function fetchTarget(key, release, force) {
     }
   }
 
-  const asset = release.assets.find((a) => t.asset.test(a.name));
-  if (!asset) throw new Error(`No release asset matching ${t.asset} in ${release.tag_name}`);
-
   const tmp = join(tmpdir(), `pdfium-${key}-${Date.now()}`);
   const archive = `${tmp}.tgz`;
   await mkdir(tmp, { recursive: true });
-  await download(asset.browser_download_url, archive);
+  await download(assetUrl(build, t.asset), archive);
 
   // Windows 10+ and macOS both ship a BSD-compatible tar.
   execFileSync('tar', ['-xzf', archive, '-C', tmp], { stdio: 'pipe' });
@@ -140,6 +145,8 @@ async function main() {
   const args = process.argv.slice(2);
   const all = args.includes('--all');
   const force = args.includes('--force');
+  const override = args.find((a) => a.startsWith('--build='));
+  const build = override ? override.slice('--build='.length) : PDFIUM_BUILD;
 
   const currentKey = Object.keys(TARGETS).find(
     (k) => TARGETS[k].host === process.platform && TARGETS[k].arch === process.arch
@@ -151,14 +158,12 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Fetching release metadata from bblanchon/pdfium-binaries ...');
-  const release = JSON.parse((await httpsGet(API)).toString('utf8'));
-  console.log(`Latest release: ${release.tag_name}`);
+  console.log(`Fetching Pdfium build ${build} (pinned here, not "latest") ...`);
 
   const results = [];
   for (const key of keys) {
     if (!key) continue;
-    results.push(await fetchTarget(key, release, force));
+    results.push(await fetchTarget(key, build, force));
   }
 
   for (const r of results) {
