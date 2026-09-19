@@ -181,6 +181,17 @@ export function App() {
         e.preventDefault();
         void pdf.stepHistory(e.shiftKey ? 'redo' : 'undo');
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && pdf.selected.length > 0) {
+        // 焦点在可编辑元素里时，退格/删除是"改字"，不是"删页"。
+        // 少了这道守卫，用户在查找框、表单值或批注文字里按退格会静默删掉一整页 ——
+        // 只有撤销能救回来，而用户多半不知道发生了什么。
+        const el = e.target as HTMLElement | null;
+        const editing =
+          !!el &&
+          (el.isContentEditable ||
+            el.tagName === 'INPUT' ||
+            el.tagName === 'TEXTAREA' ||
+            el.tagName === 'SELECT');
+        if (editing) return;
         e.preventDefault();
         void removeSelected();
       }
