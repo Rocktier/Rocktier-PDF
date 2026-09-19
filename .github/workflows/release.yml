@@ -90,7 +90,12 @@ jobs:
         run: npm ci
 
       - name: Provision qpdf sidecar
-        run: powershell -ExecutionPolicy Bypass -File scripts/provision-qpdf-windows.ps1
+        # pwsh, not powershell: Windows PowerShell 5.1 reads a BOM-less UTF-8 .ps1
+        # as the system codepage, so the Chinese comments swallow the bytes that
+        # follow them and the script dies on a bogus "missing closing '}'" error.
+        # The script now carries a BOM too, so either caller is safe.
+        shell: pwsh
+        run: pwsh -ExecutionPolicy Bypass -File scripts/provision-qpdf-windows.ps1
 
       # tauri_build::build() hard-fails when a path in bundle.resources is missing,
       # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at

@@ -1,4 +1,4 @@
-# Rocktier PDF Squeeze - 打包 qpdf 为自包含 sidecar (Windows)
+﻿# Rocktier PDF Squeeze - 打包 qpdf 为自包含 sidecar (Windows)
 #
 # 与旧版 provision-gs-windows.ps1 的差异：不再依赖 choco 装 Ghostscript，而是直接
 # 下载 qpdf 官方发布的 MSVC 构建（自带 qpdf.exe 与全部 DLL），并按官方提供的
