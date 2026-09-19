@@ -611,12 +611,17 @@ pub fn set_form_values(doc: &mut PdfDocument, values: &[(String, String)]) -> Re
                     f.set_checked(on).map_err(|e| e.to_string())?;
                 }
                 PdfFormField::RadioButton(f) => {
-                    // TODO(P1，待查 API)：这里缺一个"取消勾选"的分支，用户一旦选了
-                    // 某项就再也取消不掉，表单填错只能关掉重开。
-                    // 试过 `f.set_unchecked()` —— pdfium-render 没有这个方法；不能靠
-                    // 猜 API 上线，所以先把行为还原成现状。下一步读 pdfium-render 的
-                    // form.rs 源码，找到 radio 字段真正的"置为未选"入口
-                    // （候选：set_value("") / set_index_selected / 走 group_value）。
+                    // TODO(P1，已查清 API，待实现)：这里缺"取消勾选"的分支，用户一旦
+                    // 选了某项就再也取消不掉，表单填错只能关掉重开。
+                    //
+                    // 已核实（pdfium-render 0.9.4，读源码
+                    // src/pdf/document/page/field/radio.rs）：PdfFormRadioButtonField
+                    // 只有 index_in_group() / group_value() / is_checked() / set_checked()
+                    // 四个公开方法，**没有** set_unchecked() 之类"置为未选"的入口。
+                    //
+                    // 因此只能走底层：用 PdfFormFieldPrivate 拿到表单句柄，调
+                    // FPDF 的 FORM_SetIndexSelected(handle, index, false)。
+                    // 这条路涉及裸 FPDF 调用，需要先确认句柄与索引口径，不能凭猜写。
                     if value.eq_ignore_ascii_case("true") {
                         f.set_checked().map_err(|e| e.to_string())?;
                     }
