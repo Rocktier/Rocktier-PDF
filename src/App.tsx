@@ -8,6 +8,7 @@ import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
 import { PasswordDialog } from './components/PasswordDialog';
 import { SecurityDialog } from './components/SecurityDialog';
+import { CompressDialog } from './components/CompressDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
 import { StatusBar } from './components/StatusBar';
@@ -462,20 +463,23 @@ export function App() {
   const doc = pdf.doc;
 
   /**
-   * 压缩为副本。与加密/解密一致：**永远写出新文件，不动原件** ——
-   * 压缩是有损操作，没理由让它有权覆盖用户唯一的那个文件。
-   * 档位暂定 balanced，选择器随后补。
+   * 压缩到用户选定的**新文件**。压缩是有损操作，没理由让它有权覆盖原件 ——
+   * 与加密/解密一致。
    */
-  const runCompress = useCallback(async () => {
-    if (!doc) return;
-    const out = doc.path.replace(/\.pdf$/i, '') + '-compressed.pdf';
-    try {
-      const res = await compressDocument(doc.path, out, 'balanced');
-      notify(t('toast.saved', { name: fileStem(res.path) + '.pdf' }));
-    } catch (e) {
-      notify(String(e));
-    }
-  }, [doc, notify, t]);
+  const runCompress = useCallback(
+    async (profile: 'web' | 'balanced' | 'archive', output: string): Promise<boolean> => {
+      if (!doc) return false;
+      try {
+        const res = await compressDocument(doc.path, output, profile);
+        notify(t('toast.saved', { name: fileStem(res.path) + '.pdf' }));
+        return true;
+      } catch (e) {
+        notify(String(e));
+        return false;
+      }
+    },
+    [doc, notify, t],
+  );
 
   return (
     <div className="app">
@@ -499,7 +503,7 @@ export function App() {
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
         onSecurity={() => setDialog('security')}
-        onCompress={() => void runCompress()}
+        onCompress={() => setDialog('compress')}
         onForm={() => setDialog('form')}
         onUndo={() => void pdf.stepHistory('undo')}
         onRedo={() => void pdf.stepHistory('redo')}
@@ -573,6 +577,13 @@ export function App() {
       ) : null}
       {dialog === 'security' && doc ? (
         <SecurityDialog onClose={() => setDialog(null)} onRun={runSecurity} />
+      ) : null}
+      {dialog === 'compress' && doc ? (
+        <CompressDialog
+          defaultName={fileStem(doc.path) + '-compressed.pdf'}
+          onClose={() => setDialog(null)}
+          onRun={runCompress}
+        />
       ) : null}
       {dialog === 'form' && doc ? (
         <FormDialog
