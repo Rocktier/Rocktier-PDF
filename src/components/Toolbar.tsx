@@ -49,6 +49,7 @@ interface ToolbarProps {
   onImagesToPdf: () => void;
   onSign: () => void;
   onSecurity: () => void;
+  onCompress: () => void;
   onForm: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -80,6 +81,7 @@ export function Toolbar({
   onImagesToPdf,
   onSign,
   onSecurity,
+  onCompress,
   onForm,
   onUndo,
   onRedo,
@@ -224,6 +226,9 @@ export function Toolbar({
       </button>
       <button className="btn btn-icon" onClick={onSecurity} disabled={!doc || busy} title={t('security.title')}>
         <IconLock />
+      </button>
+      <button className="btn btn-icon" onClick={onCompress} disabled={!doc || busy} title={t('security.title')}>
+        <IconSave />
       </button>
       <button className="btn btn-icon" onClick={onForm} disabled={!doc || busy} title={t('form.title')}>
         <IconForm />

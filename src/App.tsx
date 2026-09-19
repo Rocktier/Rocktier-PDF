@@ -36,7 +36,7 @@ import {
 import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
-type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | null;
+type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | null;
 
 const THEME_KEY = 'rocktier-pdf-editor.theme';
 
@@ -460,6 +460,22 @@ export function App() {
 
   const doc = pdf.doc;
 
+  /**
+   * 压缩为副本。与加密/解密一致：**永远写出新文件，不动原件** ——
+   * 压缩是有损操作，没理由让它有权覆盖用户唯一的那个文件。
+   * 档位暂定 balanced，选择器随后补。
+   */
+  const runCompress = useCallback(async () => {
+    if (!doc) return;
+    const out = doc.path.replace(/\.pdf$/i, '') + '-compressed.pdf';
+    try {
+      const res = await compressDocument(doc.path, out, 'balanced');
+      notify(t('toast.saved', { name: fileStem(res.path) + '.pdf' }));
+    } catch (e) {
+      notify(String(e));
+    }
+  }, [doc, notify, t]);
+
   return (
     <div className="app">
       <Toolbar
@@ -482,6 +498,7 @@ export function App() {
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
         onSecurity={() => setDialog('security')}
+        onCompress={() => void runCompress()}
         onForm={() => setDialog('form')}
         onUndo={() => void pdf.stepHistory('undo')}
         onRedo={() => void pdf.stepHistory('redo')}

@@ -168,6 +168,19 @@ export async function removePassword(
 ): Promise<PathResult> {
   return invoke<PathResult>('remove_password', { input, output, password });
 }
+  /**
+   * Compress `input` to `output`. Two passes: qpdf normalises structure and
+   * re-compresses the images it can, then our pass handles what qpdf skips
+   * (ICCBased JPEGs). Writes a copy — never touches the original.
+   */
+  export async function compressDocument(
+    input: string,
+    output: string,
+    profile: 'web' | 'balanced' | 'archive'
+  ): Promise<PathResult> {
+    return invoke<PathResult>('compress_document', { input, output, profile });
+  }
+
 
 /* ── Import / export images ─────────────────────────────────────── */
 
