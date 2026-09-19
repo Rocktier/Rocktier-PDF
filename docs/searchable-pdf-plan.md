@@ -26,8 +26,16 @@ src-tauri/gen/*
 | 3 | `Cargo.toml` 第一个 `[[bin]]` 名（无则 `[package]` 名）|
 | 4 | `productName`（最后兜底）|
 
-它落到了第 4 级（`Rocktier PDF` → `RocktierPDF`），而实际产物是 `rocktier-pdf-editor.exe`
-（Cargo 包名）。**修法是显式钉住**：`executableName` + `mainBinaryName` 都写成 `rocktier-pdf-editor`。
+它落到了第 4 级（`Rocktier PDF` → `RocktierPDF`），而实际产物是 `rocktier-pdf-editor.exe`（Cargo 包名）。
+
+**第一轮修错了**：我把 `executableName` 与 `mainBinaryName` 都写成 `rocktier-pdf-editor`
+（= 等于没改），重跑仍然找 `RocktierPDF.exe` —— 说明**锁定的 0.1.29 不认 `executableName`**
+（我读的 README 是更新版本的行为）。
+
+**正解是顺着它走**：Tauri 官方文档写明 *"By default, Tauri uses the output binary from cargo;
+by setting this, we will rename that"* —— 即 `mainBinaryName` 会**重命名 cargo 产物**。
+所以设成工具期望的 `RocktierPDF`，产物名与期望名一致。**不要去改 Cargo 的 bin 名**：那会牵连
+`ci.yml` / `release.yml` / `README` / `ARCHITECTURE` 里的 `cargo test --bin rocktier-pdf-editor`。
 
 **教训**：从别的仓库搬打包机制时，**配置字段也要一起搬** —— 我搬了 `gen/windows/`、脚本与依赖，
 唯独漏了命名相关的字段，而它恰好是工具用来找产物的那把钥匙。

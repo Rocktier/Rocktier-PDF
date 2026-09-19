@@ -24,7 +24,7 @@
     }
   },
   "productName": "Rocktier PDF",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "identifier": "Rocktier.RocktierPDF",
   "app": {
     "windows": [
@@ -44,5 +44,5 @@
     },
     "withGlobalTauri": false
   },
-  "mainBinaryName": "rocktier-pdf-editor"
+  "mainBinaryName": "RocktierPDF"
 }

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-APP="$ROOT/src-tauri/target/release/bundle/macos/Rocktier PDF Editor.app"
+APP="$ROOT/src-tauri/target/release/bundle/macos/Rocktier PDF.app"
 DMG="$HOME/Downloads/Rocktier PDF Editor.dmg"
 
 echo "▸ Building release .app..."
@@ -30,7 +30,7 @@ if [ -x /opt/homebrew/bin/create-dmg ]; then
     --window-pos 200 120 \
     --window-size 600 400 \
     --icon-size 110 \
-    --icon "Rocktier PDF Editor.app" 130 185 \
+    --icon "Rocktier PDF.app" 130 185 \
     --app-drop-link 450 185 \
     --format UDZO \
     --no-internet-enable \
@@ -41,7 +41,7 @@ else
 fi
 
 echo "▸ Delivering to ~/Downloads..."
-rm -rf "$HOME/Downloads/Rocktier PDF Editor.app"
+rm -rf "$HOME/Downloads/Rocktier PDF.app"
 cp -R "$APP" "$HOME/Downloads/"
 
 echo ""
