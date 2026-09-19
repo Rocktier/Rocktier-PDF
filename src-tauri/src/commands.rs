@@ -239,6 +239,9 @@ pub async fn move_page(
 
 /* ── Save / export ───────────────────────────────────────────────── */
 
+/// Makes each concurrent save use its own temp file. See `save_document`.
+static TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[tauri::command]
 pub async fn save_document(
     state: State<'_, AppState>,
@@ -257,9 +260,32 @@ pub async fn save_document(
         }
     };
 
+    // Save through a temp file next to the target, then rename. `save_to_file` writes
+    // straight to the destination, so a full disk or a permission error halfway
+    // through leaves the user's original PDF truncated and unrecoverable.
+    // The temp keeps a `.pdf` suffix because pdfium picks its writer from the path.
+    let target_path = std::path::Path::new(&target);
+    let dir = target_path
+        .parent()
+        .ok_or_else(|| "Invalid path".to_string())?;
+    let name = target_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid file name".to_string())?;
+    let tmp = dir.join(format!(
+        ".{}.{}.{}.tmp.pdf",
+        name,
+        std::process::id(),
+        TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_file(&tmp);
     doc.document
-        .save_to_file(&target)
+        .save_to_file(&tmp)
         .map_err(|e| format!("Cannot save PDF: {e}"))?;
+    if let Err(e) = std::fs::rename(&tmp, &target) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("Cannot save PDF: {e}"));
+    }
 
     doc.path = target.clone();
     doc.dirty = false;
