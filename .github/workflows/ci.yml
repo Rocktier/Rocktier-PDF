@@ -1,0 +1,40 @@
+name: Checks
+
+# Editor 此前**没有任何 CI**（合并前它一直靠手动跑）。压缩能力并进来之后，
+# 两条写文件路径（pdfium / qpdf）同处一个应用，没有自动化检查是不可接受的。
+# 规格对齐 Squeeze 的 ci.yml：前端类型检查 + Rust 测试 + clippy -D warnings。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  checks:
+    name: Tests & Lints
+    # macOS 而不是 ubuntu：Tauri 在 Linux 上编译需要 glib/gtk 系统库，
+    # 裸 runner 会直接失败（Squeeze 那边踩过）。
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install qpdf + frontend deps
+        run: |
+          brew install qpdf
+          npm ci
+      - name: Provision qpdf sidecar
+        run: bash scripts/provision-qpdf-macos.sh
+      - name: Frontend typecheck
+        run: npx tsc --noEmit
+      - name: Rust tests
+        working-directory: ./src-tauri
+        run: cargo test --all-targets
+      - name: Rust lints
+        working-directory: ./src-tauri
+        run: cargo clippy --all-targets -- -D warnings

@@ -9,6 +9,7 @@
     "active": true,
     "targets": "all",
     "resources": [
+      "resources/qpdf",
       "resources/pdfium-runtime"
     ],
     "icon": [

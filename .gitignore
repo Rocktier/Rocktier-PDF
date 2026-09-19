@@ -14,3 +14,4 @@ src-tauri/resources/pdfium-runtime/
 *.log
 .env
 .vite/
+src-tauri/resources/qpdf/
