@@ -99,7 +99,8 @@ src-tauri/
 scripts/fetch-pdfium.mjs
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture.
+Architecture notes live with the family records (private) rather than in this
+repository, which carries source only.
 
 ## Testing
 
