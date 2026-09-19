@@ -883,71 +883,63 @@ mod tests {
 
     /// P0-3 的核心断言：原地重排必须保住文档级结构（这里是书签），
     /// 而旧路径（新建文档+逐页拷贝）正是把 `/Outlines` 丢掉的地方。
+    /// P0-3 的核心断言：**原地重排必须保住书签**。
+    ///
+    /// 走真实文档而不是合成夹具：手工页树在 lopdf 的 `get_pages()` 下只看到不足
+    /// 声明页数（试过补 trailer `/Root` 仍不行），断言根本没机会跑。真实带书签的
+    /// PDF 才能证明"只改 /Kids 顺序"这条路真的保住了 `/Outlines`。
+    ///
+    /// 用 ROCKTIER_TEST_PDF 指定一份**带书签**的 PDF（CI 不跑，真实文档不入库）：
+    ///   ROCKTIER_TEST_PDF=~/Downloads/x.pdf cargo test keeps_bookmarks -- --nocapture
     #[test]
-    #[ignore = "夹具未通过，而非实现未通过：手工页树在 lopdf 的 get_pages() 下只看到不足 3 页（加了 trailer /Root 后依旧），原地重排因此提前报错，书签断言根本没跑到。下一个会话改用**真实带书签的 PDF** 做夹具（可用 mutool create 或从 Downloads 里挑一份），再解除 ignore。在此之前：实现的设计（只改 /Kids 顺序、不新建对象）按构造保住引用，但**没有实证**。"]
-    fn reorder_in_place_keeps_outlines_and_changes_page_order() {
-        let mut doc = lopdf::Document::with_version("1.5");
+    fn reorder_in_place_keeps_bookmarks_on_a_real_document() {
+        let path = match std::env::var("ROCKTIER_TEST_PDF") {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        let bytes = std::fs::read(&path).expect("读不到测试 PDF");
 
-        // 3 个页面对象，/Parent 都指向页树节点 (1,0)
-        let mut kids = Vec::new();
-        for i in 0..3u32 {
-            let id = (10 + i, 0u16);
-            doc.objects.insert(
-                id,
-                lopdf::Object::Dictionary(lopdf::dictionary! {
-                    "Type" => "Page",
-                    "Parent" => lopdf::Object::Reference((1, 0)),
-                    "MediaBox" => lopdf::Object::Array(vec![
-                        0.into(), 0.into(), 100.into(), 100.into(),
-                    ]),
-                }),
-            );
-            kids.push(lopdf::Object::Reference(id));
-        }
-        doc.objects.insert(
-            (1, 0),
-            lopdf::Object::Dictionary(lopdf::dictionary! {
-                "Type" => "Pages",
-                "Count" => 3i64,
-                "Kids" => lopdf::Object::Array(kids),
-            }),
-        );
-        doc.objects.insert(
-            (2, 0),
-            lopdf::Object::Dictionary(lopdf::dictionary! { "Type" => "Outlines", "Count" => 1i64 }),
-        );
-        doc.objects.insert(
-            (3, 0),
-            lopdf::Object::Dictionary(lopdf::dictionary! {
-                "Type" => "Catalog",
-                "Pages" => lopdf::Object::Reference((1, 0)),
-                "Outlines" => lopdf::Object::Reference((2, 0)),
-            }),
-        );
+        let before = lopdf::Document::load_from(std::io::Cursor::new(&bytes)).expect("原文件可解析");
+        let has_outlines = before
+            .trailer
+            .get(b"Root")
+            .ok()
+            .and_then(|r| r.as_reference().ok())
+            .and_then(|r| before.get_object(r).ok())
+            .and_then(|o| o.as_dict().ok())
+            .map(|d| d.get(b"Outlines").is_ok())
+            .unwrap_or(false);
+        let page_count = before.get_pages().len();
+        assert!(has_outlines, "这份夹具本身没有书签，无法用来验证");
+        assert!(page_count >= 3, "夹具至少要有 3 页");
 
-        // 关键：Catalog 必须挂到 trailer 的 /Root 上，否则 lopdf 的 get_pages()
-        // 根本找不到页树 —— 这正是这个测试一开始失败的原因（夹具问题，非代码问题）。
-        doc.trailer
-            .set("Root", lopdf::Object::Reference((3, 0)));
+        // 把第 3 页移到最前，其余顺序不动
+        let mut order: Vec<i32> = (0..page_count as i32).collect();
+        let moved = order.remove(2);
+        order.insert(0, moved);
 
-        let mut bytes: Vec<u8> = Vec::new();
-        doc.save_to(&mut bytes).unwrap();
-
-        // 把第 3 页移到最前：顺序 3,1,2
-        let out = reorder_in_place(&bytes, &[2, 0, 1]).expect("原地重排应当成功");
+        let out = reorder_in_place(&bytes, &order).expect("原地重排应当成功");
         let after = lopdf::Document::load_from(std::io::Cursor::new(&out)).expect("产物可解析");
 
-        let root = after.trailer.get(b"Root").unwrap().as_reference().unwrap();
-        let catalog = after.get_object(root).unwrap().as_dict().unwrap();
+        let catalog = after
+            .get_object(after.trailer.get(b"Root").unwrap().as_reference().unwrap())
+            .unwrap();
+        let dict = catalog.as_dict().unwrap();
         assert!(
-            catalog.get(b"Outlines").is_ok(),
-            "书签必须保留 —— 旧路径正是在这里丢掉的"
+            dict.get(b"Outlines").is_ok(),
+            "书签必须保留 —— 旧路径（新建文档+逐页拷贝）正是在这里丢掉的"
         );
+        assert_eq!(after.get_pages().len(), page_count, "页数不变");
 
-        let pages = after.get_pages();
-        assert_eq!(pages.get(&1).copied(), Some((12, 0)), "第 1 页应为原来的第 3 页");
-        assert_eq!(pages.get(&2).copied(), Some((10, 0)), "第 2 页应为原来的第 1 页");
-        assert_eq!(pages.len(), 3, "页数不变");
+        // 页序确实变了：第 1 页应是原来的第 3 页
+        let original_first_of_new = before.get_pages().get(&3).copied().unwrap();
+        let new_first = after.get_pages().get(&1).copied().unwrap();
+        assert_eq!(new_first, original_first_of_new, "第 1 页应变成原来的第 3 页");
+
+        println!(
+            "BOOKMARKS OK: {} 页, 书签保留, 全部/Outlines 仍在 catalog 中",
+            page_count
+        );
     }
 
     /// 页树是多级结构时必须明确拒绝，交给调用方退回旧路径，而不是改坏树。
