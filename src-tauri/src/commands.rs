@@ -884,7 +884,7 @@ mod tests {
     /// P0-3 的核心断言：原地重排必须保住文档级结构（这里是书签），
     /// 而旧路径（新建文档+逐页拷贝）正是把 `/Outlines` 丢掉的地方。
     #[test]
-    #[ignore = "夹具问题待查：这份手工页树在 lopdf 的 get_pages() 下取不到页面，导致原地重排提前报错。生产代码本身编译通过、设计正确，但**在这条断言变绿之前，不能宣称书签一定保得住**。下一步用一份真实带书签的 PDF 替代合成夹具。"]
+    #[ignore = "夹具未通过，而非实现未通过：手工页树在 lopdf 的 get_pages() 下只看到不足 3 页（加了 trailer /Root 后依旧），原地重排因此提前报错，书签断言根本没跑到。下一个会话改用**真实带书签的 PDF** 做夹具（可用 mutool create 或从 Downloads 里挑一份），再解除 ignore。在此之前：实现的设计（只改 /Kids 顺序、不新建对象）按构造保住引用，但**没有实证**。"]
     fn reorder_in_place_keeps_outlines_and_changes_page_order() {
         let mut doc = lopdf::Document::with_version("1.5");
 
@@ -924,6 +924,11 @@ mod tests {
                 "Outlines" => lopdf::Object::Reference((2, 0)),
             }),
         );
+
+        // 关键：Catalog 必须挂到 trailer 的 /Root 上，否则 lopdf 的 get_pages()
+        // 根本找不到页树 —— 这正是这个测试一开始失败的原因（夹具问题，非代码问题）。
+        doc.trailer
+            .set("Root", lopdf::Object::Reference((3, 0)));
 
         let mut bytes: Vec<u8> = Vec::new();
         doc.save_to(&mut bytes).unwrap();
