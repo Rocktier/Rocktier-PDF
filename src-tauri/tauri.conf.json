@@ -24,7 +24,7 @@
     }
   },
   "productName": "Rocktier PDF",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "Rocktier.RocktierPDF",
   "app": {
     "windows": [
@@ -43,5 +43,6 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost"
     },
     "withGlobalTauri": false
-  }
+  },
+  "mainBinaryName": "rocktier-pdf-editor"
 }
