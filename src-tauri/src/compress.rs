@@ -1,0 +1,125 @@
+//! 压缩能力 —— 自 Rocktier PDF Squeeze 合并而来。
+//!
+//! 两步：qpdf 做结构规范化与图像重压（Apache-2.0，只重写图像流与对象结构、
+//! 不动内容流，因此文字层逐字节保留），再用我们自己的 imagepass 补上 qpdf
+//! 跳过的那一类图像（ICCBased JPEG）。详见 `PDF产品线合并方案.md` §11。
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// 档位 → qpdf 的 JPEG 质量。与 `imagepass` 的口径必须一致，否则两条路径
+/// 会给出不同观感。
+pub fn qpdf_args(profile: &str) -> Vec<String> {
+    let jpeg_q = match profile {
+        "web" => "40",
+        "archive" => "85",
+        _ => "60",
+    };
+    vec![
+        "--optimize-images".to_string(),
+        format!("--jpeg-quality={jpeg_q}"),
+        "--object-streams=generate".to_string(),
+        "--compress-streams=y".to_string(),
+        "--recompress-flate".to_string(),
+        "--compression-level=9".to_string(),
+    ]
+}
+
+fn find_in_path(name: &str) -> Option<PathBuf> {
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// 定位 qpdf。打包后它在 `resources/qpdf/`，开发时可回退到 PATH。
+pub fn find_qpdf() -> Result<PathBuf, String> {
+    let name = if cfg!(windows) { "qpdf.exe" } else { "qpdf" };
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("qpdf").join(name));
+            candidates.push(dir.join("resources").join("qpdf").join(name));
+            candidates.push(dir.join(name));
+        }
+    }
+    candidates.push(PathBuf::from("src-tauri/resources/qpdf").join(name));
+    if let Some(p) = find_in_path(name) {
+        candidates.push(p);
+    }
+    for c in &candidates {
+        if c.exists() {
+            return Ok(c.clone());
+        }
+    }
+    Err(format!(
+        "qpdf engine not found. Searched: {}",
+        candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
+}
+
+/// 产物结构自检：非空、`%PDF-` 头、`%%EOF` 尾。
+/// qpdf 退出码为 0 不代表产出可用，压缩器绝不能拿用户原件去赌。
+pub fn verify_pdf(path: &Path) -> Result<(), String> {
+    let data = std::fs::read(path).map_err(|e| e.to_string())?;
+    if data.len() < 64 {
+        return Err(format!("output is only {} bytes", data.len()));
+    }
+    if !data.starts_with(b"%PDF-") {
+        return Err("missing %PDF- header".to_string());
+    }
+    let tail = &data[data.len().saturating_sub(1024)..];
+    if !tail.windows(5).any(|w| w == b"%%EOF") {
+        return Err("missing %%EOF trailer".to_string());
+    }
+    Ok(())
+}
+
+/// 压缩 `input` 到 `output`，返回产物字节数。
+///
+/// 每一步都只在**确实更小**时才采用上一步的产物 —— 图像 pass 用 lopdf 重存
+/// 会丢掉 qpdf 生成的压缩对象流，实测有文件因此变大 1–2%，少了这道判断
+/// 就会把"压缩"做成"变大"。
+pub fn compress(input: &Path, output: &Path, profile: &str) -> Result<u64, String> {
+    let qpdf = find_qpdf()?;
+
+    let staged = output.with_extension("qpdf.pdf");
+    let _ = std::fs::remove_file(&staged);
+    let status = Command::new(&qpdf)
+        .args(qpdf_args(profile))
+        .arg(input)
+        .arg(&staged)
+        .status()
+        .map_err(|e| format!("Failed to start qpdf: {e}"))?;
+    if !status.success() {
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("qpdf exited with {:?}", status.code()));
+    }
+    verify_pdf(&staged)?;
+
+    let after_images = output.with_extension("imgpass.pdf");
+    let _ = std::fs::remove_file(&after_images);
+    if let Ok(r) = crate::imagepass::reencode_images(&staged, &after_images, profile) {
+        if r.recompressed > 0 {
+            let smaller = std::fs::metadata(&after_images)
+                .map(|m| m.len())
+                .unwrap_or(u64::MAX)
+                < std::fs::metadata(&staged).map(|m| m.len()).unwrap_or(0);
+            if smaller && std::fs::rename(&after_images, &staged).is_ok() {
+                verify_pdf(&staged)?;
+            }
+        }
+    }
+    let _ = std::fs::remove_file(&after_images);
+
+    std::fs::rename(&staged, output).map_err(|e| format!("Cannot write output: {e}"))?;
+    Ok(std::fs::metadata(output).map(|m| m.len()).unwrap_or(0))
+}

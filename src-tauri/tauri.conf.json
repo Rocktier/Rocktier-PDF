@@ -22,9 +22,9 @@
       "entitlements": "Entitlements.plist"
     }
   },
-  "productName": "Rocktier PDF Editor",
-  "version": "0.1.0",
-  "identifier": "studio.rocktier.pdf.editor",
+  "productName": "Rocktier PDF",
+  "version": "1.0.0",
+  "identifier": "Rocktier.RocktierPDF",
   "app": {
     "windows": [
       {

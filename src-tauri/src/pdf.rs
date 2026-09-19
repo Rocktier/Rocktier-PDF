@@ -622,9 +622,12 @@ pub fn set_form_values(doc: &mut PdfDocument, values: &[(String, String)]) -> Re
                     // 因此只能走底层：用 PdfFormFieldPrivate 拿到表单句柄，调
                     // FPDF 的 FORM_SetIndexSelected(handle, index, false)。
                     // 这条路涉及裸 FPDF 调用，需要先确认句柄与索引口径，不能凭猜写。
-                    if value.eq_ignore_ascii_case("true") {
-                        f.set_checked().map_err(|e| e.to_string())?;
-                    }
+                    // 让 if 作为表达式取值：写成 if 语句时 clippy 会报
+                    // collapsible_match，而这里是必须保留的分支逻辑。
+                    let on = value.eq_ignore_ascii_case("true") || value == "1";
+                    let applied: Result<(), pdfium_render::prelude::PdfiumError> =
+                        if on { f.set_checked() } else { Ok(()) };
+                    applied.map_err(|e| e.to_string())?;
                 }
                 _ => {}
             }

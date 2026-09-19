@@ -1,7 +1,7 @@
 {
-  "name": "rocktier-pdf-editor",
+  "name": "rocktier-pdf",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Edit PDFs. Fast, private, no internet needed.",
   "type": "module",
   "scripts": {

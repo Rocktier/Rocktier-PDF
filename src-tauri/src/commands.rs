@@ -969,3 +969,20 @@ mod tests {
         assert!(reorder_in_place(&bytes, &[0]).is_err());
     }
 }
+
+/* ── Compression (merged in from Rocktier PDF Squeeze) ───────────── */
+
+/// 压缩一份 PDF，写出到 `output`。同步命令：Tauri 会把它放到线程池上跑，
+/// 不会阻塞 UI 线程，也就不需要为此引入 tokio 任务编排。
+#[tauri::command]
+pub async fn compress_document(
+    input: String,
+    output: String,
+    profile: String,
+) -> CmdResult<PathResult> {
+    let input_path = PathBuf::from(&input);
+    let output = ensure_pdf_extension(output);
+    let output_path = PathBuf::from(&output);
+    let size = crate::compress::compress(&input_path, &output_path, &profile)?;
+    Ok(PathResult { path: output, size })
+}

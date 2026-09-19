@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod compress;
+mod imagepass;
 mod pdf;
 mod security;
 mod state;
@@ -199,7 +201,8 @@ fn main() {
             commands::reveal_in_finder,
             build_menu,
             open_url,
-        ])
+        
+            commands::compress_document,])
         .on_menu_event(|app, event| {
             // Menu clicks become a frontend action chain, so unsaved-changes
             // guards and toasts stay in one place.
