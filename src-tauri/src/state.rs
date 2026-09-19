@@ -25,6 +25,14 @@ pub struct OpenDoc {
     pub undo: Vec<Vec<u8>>,
     /// Snapshots popped by undo, available again via redo (newest last).
     pub redo: Vec<Vec<u8>>,
+    /// Radio groups the user explicitly cleared, by field name.
+    ///
+    /// pdfium cannot unselect a radio button (see `formclear.rs` for why, and
+    /// what pdfium-render keeps out of reach), so the request is recorded here
+    /// and applied to the file when it is written. Re-checking a group removes
+    /// its name again. Stale entries are harmless: `clear_radio_groups` ignores
+    /// names that do not belong to a radio group.
+    pub radio_clears: std::collections::BTreeSet<String>,
 }
 
 pub struct AppState {

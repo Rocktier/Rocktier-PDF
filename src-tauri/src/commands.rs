@@ -73,6 +73,7 @@ pub async fn open_document(
         dirty: false,
         undo: Vec::new(),
         redo: Vec::new(),
+        radio_clears: std::collections::BTreeSet::new(),
     });
 
     Ok(info)
@@ -320,6 +321,11 @@ pub async fn save_document(
     doc.document
         .save_to_file(&tmp)
         .map_err(|e| format!("Cannot save PDF: {e}"))?;
+    // 在 rename 之前跑：这一步失败就中止保存，用户的原件一个字节都没动。
+    if let Err(e) = crate::formclear::clear_radio_groups(&tmp, &doc.radio_clears) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
     if let Err(e) = std::fs::rename(&tmp, &target) {
         let _ = std::fs::remove_file(&tmp);
         return Err(format!("Cannot save PDF: {e}"));
@@ -667,6 +673,19 @@ pub async fn set_form_values(
 
     push_undo(doc);
     crate::pdf::set_form_values(&mut doc.document, &values)?;
+
+    // pdfium 能把 radio 组选中，却没有"取消选中"的能力（原委见 formclear.rs）。
+    // 这里只登记用户的意图，真正的清空在写文件时完成。
+    //
+    // 已知的边角：撤销不会回滚这个登记集合（undo 恢复的是字节快照），所以
+    // "取消选中 → 撤销 → 再保存"仍会写出未选中的状态。比"永远取消不掉"好。
+    for (name, value) in &values {
+        if value.eq_ignore_ascii_case("true") || value == "1" {
+            doc.radio_clears.remove(name);
+        } else if value.eq_ignore_ascii_case("false") || value == "0" {
+            doc.radio_clears.insert(name.clone());
+        }
+    }
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
 }

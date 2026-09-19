@@ -113,6 +113,26 @@ pub fn init_pdfium(app: &tauri::AppHandle) -> Result<&'static Pdfium, String> {
     Ok(PDFIUM.get_or_init(|| loaded))
 }
 
+/// The single Pdfium instance for the whole test binary.
+///
+/// pdfium can only be initialised once per process — a second bind fails with
+/// `PdfiumLibraryBindingsAlreadyInitialized`. Tests run in parallel threads of
+/// one process, so every test that used to call `bind_pdfium` itself was racing
+/// for the one slot: whichever won, the rest failed. Memoising here (under a
+/// lock, so the winner is decided before the binding starts) makes the suite
+/// deterministic regardless of thread count or ordering.
+#[cfg(test)]
+pub fn test_pdfium() -> &'static Pdfium {
+    static INIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = INIT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(existing) = PDFIUM.get() {
+        return existing;
+    }
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/pdfium-runtime");
+    let loaded = bind_pdfium(&[dir]).expect("bundled Pdfium must load");
+    PDFIUM.get_or_init(|| loaded)
+}
+
 /// Split out from [`init_pdfium`] so tests can bind without an `AppHandle`.
 pub fn bind_pdfium(dirs: &[PathBuf]) -> Result<Pdfium, String> {
     for dir in dirs {
@@ -610,24 +630,19 @@ pub fn set_form_values(doc: &mut PdfDocument, values: &[(String, String)]) -> Re
                     let on = value.eq_ignore_ascii_case("true") || value == "1";
                     f.set_checked(on).map_err(|e| e.to_string())?;
                 }
-                PdfFormField::RadioButton(f) => {
-                    // TODO(P1，已查清 API，待实现)：这里缺"取消勾选"的分支，用户一旦
-                    // 选了某项就再也取消不掉，表单填错只能关掉重开。
-                    //
-                    // 已核实（pdfium-render 0.9.4，读源码
-                    // src/pdf/document/page/field/radio.rs）：PdfFormRadioButtonField
-                    // 只有 index_in_group() / group_value() / is_checked() / set_checked()
-                    // 四个公开方法，**没有** set_unchecked() 之类"置为未选"的入口。
-                    //
-                    // 因此只能走底层：用 PdfFormFieldPrivate 拿到表单句柄，调
-                    // FPDF 的 FORM_SetIndexSelected(handle, index, false)。
-                    // 这条路涉及裸 FPDF 调用，需要先确认句柄与索引口径，不能凭猜写。
-                    // 让 if 作为表达式取值：写成 if 语句时 clippy 会报
-                    // collapsible_match，而这里是必须保留的分支逻辑。
-                    let on = value.eq_ignore_ascii_case("true") || value == "1";
-                    let applied: Result<(), pdfium_render::prelude::PdfiumError> =
-                        if on { f.set_checked() } else { Ok(()) };
-                    applied.map_err(|e| e.to_string())?;
+                    // pdfium can only *select* a radio button; there is no call
+                    // that clears one. Deselecting is therefore done at the file
+                    // level on the way out — see `formclear.rs` for why the
+                    // documented raw-handle route is closed (pdfium-render keeps
+                    // `PdfFormFieldPrivate` `pub(crate)` on purpose) and what runs
+                    // instead. Saving records the request; this branch only ever
+                    // turns something on.
+                // A guard rather than an inner `if`: clippy reads the latter as
+                // collapsible, and the condition genuinely belongs to the pattern.
+                PdfFormField::RadioButton(f)
+                    if value.eq_ignore_ascii_case("true") || value == "1" =>
+                {
+                    f.set_checked().map_err(|e| e.to_string())?;
                 }
                 _ => {}
             }
@@ -775,9 +790,8 @@ mod tests {
     use super::*;
 
     /// Bind against the copy `build.rs` staged for bundling.
-    fn engine() -> Pdfium {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/pdfium-runtime");
-        bind_pdfium(&[dir]).expect("bundled Pdfium must load")
+    fn engine() -> &'static Pdfium {
+        test_pdfium()
     }
 
     fn three_page_doc(pdfium: &Pdfium) -> PdfDocument<'_> {
@@ -793,7 +807,7 @@ mod tests {
     #[test]
     fn renders_a_page_to_png() {
         let pdfium = engine();
-        let doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(pdfium);
 
         assert_eq!(doc.pages().len(), 3);
 
@@ -808,7 +822,7 @@ mod tests {
     #[test]
     fn save_then_reload_roundtrips() {
         let pdfium = engine();
-        let doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(pdfium);
 
         let dir = std::env::temp_dir().join("rocktier-pdf-editor-tests");
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -829,7 +843,7 @@ mod tests {
     #[test]
     fn rotation_is_persisted_on_the_page() {
         let pdfium = engine();
-        let doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(pdfium);
 
         let mut page = doc.pages().get(1).expect("page 1");
         assert_eq!(page.rotation().map(degrees_of).unwrap_or(0), 0);
@@ -853,7 +867,7 @@ mod tests {
     #[test]
     fn deleting_and_copying_pages_works() {
         let pdfium = engine();
-        let doc = three_page_doc(&pdfium);
+        let doc = three_page_doc(pdfium);
 
         doc.pages().get(0).expect("page").delete().expect("delete");
         assert_eq!(doc.pages().len(), 2);
@@ -873,8 +887,8 @@ mod tests {
     #[test]
     fn merging_appends_pages() {
         let pdfium = engine();
-        let mut dest = three_page_doc(&pdfium);
-        let source = three_page_doc(&pdfium);
+        let mut dest = three_page_doc(pdfium);
+        let source = three_page_doc(pdfium);
 
         dest.pages_mut().append(&source).expect("append");
         assert_eq!(dest.pages().len(), 6);

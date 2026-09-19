@@ -3,6 +3,7 @@
 
 mod commands;
 mod compress;
+mod formclear;
 mod imagepass;
 mod pdf;
 mod security;
