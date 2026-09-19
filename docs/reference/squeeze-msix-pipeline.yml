@@ -1,0 +1,105 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Attach the built artifacts to this existing release tag (e.g. v1.0.2). Required for manual runs — without it the workflow tries to upload to the branch name.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS (Apple Silicon)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install qpdf + build deps
+        run: |
+          brew install qpdf
+          npm ci
+      - name: Provision qpdf sidecar
+        run: bash scripts/provision-qpdf-macos.sh
+      - name: Build & Sign (macOS)
+        run: bash scripts/build-and-sign.sh
+      - name: Ensure Release Exists
+        run: |
+          if ! gh release view ${{ inputs.release_tag || github.ref_name }} > /dev/null 2>&1; then
+            gh release create ${{ inputs.release_tag || github.ref_name }} --title ${{ inputs.release_tag || github.ref_name }} --notes "Automated build for ${{ inputs.release_tag || github.ref_name }}"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload DMG to Release
+        run: |
+          for i in {1..10}; do
+            gh release upload ${{ inputs.release_tag || github.ref_name }} /tmp/pdf-squeeze-signed.dmg --clobber && break || sleep 5
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    name: Build Windows (x64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # tauri-windows-bundle builds with an explicit --target, so the target
+          # has to be present. (Host target on windows-latest, but the tool's own
+          # CI recipe asks for it explicitly — cheap insurance.)
+          targets: x86_64-pc-windows-msvc
+      - name: Install build deps
+        run: |
+          npm ci
+      - name: Provision qpdf sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts/provision-qpdf-windows.ps1
+      - name: Build Tauri app (MSI)
+        run: npm run tauri:build
+      - name: Build MSIX (for Microsoft Store)
+        run: npm run tauri:windows:build
+      # The macOS job normally wins the race, but a Windows-only re-run (or a
+      # cancelled macOS job) would otherwise leave nothing to upload to.
+      - name: Ensure Release Exists
+        run: |
+          if ! gh release view ${{ inputs.release_tag || github.ref_name }} > /dev/null 2>&1; then
+            gh release create ${{ inputs.release_tag || github.ref_name }} --title ${{ inputs.release_tag || github.ref_name }} --notes "Automated build for ${{ inputs.release_tag || github.ref_name }}"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload MSI to Release
+        run: |
+          for i in {1..10}; do
+            gh release upload ${{ inputs.release_tag || github.ref_name }} src-tauri/target/release/bundle/msi/*.msi --clobber && break || sleep 5
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # tauri-windows-bundle writes to src-tauri/target/msix/, NOT to
+      # src-tauri/gen/windows/output/ — gen/windows/ only holds the inputs
+      # (bundle.config.json, AppxManifest.xml.template, Assets/). A wrong glob
+      # here fails silently: nothing is uploaded and nobody is told.
+      - name: Upload MSIX to Release
+        run: |
+          for i in {1..10}; do
+            gh release upload ${{ inputs.release_tag || github.ref_name }} src-tauri/target/msix/*.msix* --clobber && break || sleep 5
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
