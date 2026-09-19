@@ -32,7 +32,8 @@ import {
   revealInFinder,
   searchDocument,
   setPassword,
-} from './services/engine';
+    compressDocument,
+  } from './services/engine';
 import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
