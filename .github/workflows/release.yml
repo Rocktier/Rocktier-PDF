@@ -18,6 +18,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: Install qpdf + provision the sidecar
+        run: |
+          brew install qpdf
+          bash scripts/provision-qpdf-macos.sh
+      # tauri_build::build() hard-fails when a path in bundle.resources is missing,
+      # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at
+      # cargo check - which is exactly how the v1.0.0 run failed.
       - name: Fetch Pdfium
         run: node scripts/fetch-pdfium.mjs --all
       - name: cargo check
@@ -45,6 +52,13 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - name: Provision qpdf sidecar
+        run: |
+          brew install qpdf
+          bash scripts/provision-qpdf-macos.sh
+      # tauri_build::build() hard-fails when a path in bundle.resources is missing,
+      # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at
+      # cargo check - which is exactly how the v1.0.0 run failed.
       - name: Build
         run: npm run tauri:build -- --target aarch64-apple-darwin
 
@@ -75,6 +89,12 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - name: Provision qpdf sidecar
+        run: powershell -ExecutionPolicy Bypass -File scripts/provision-qpdf-windows.ps1
+
+      # tauri_build::build() hard-fails when a path in bundle.resources is missing,
+      # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at
+      # cargo check - which is exactly how the v1.0.0 run failed.
       - name: Build
         run: npm run tauri:build
 
