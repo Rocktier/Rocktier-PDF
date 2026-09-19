@@ -1,0 +1,30 @@
+{
+  "publisher": "CN=4EA39D7A-401B-4D56-98D0-8ECB1F2B8DF7",
+  "publisherDisplayName": "Rocktier",
+  "capabilities": {
+    "general": [
+      "internetClient"
+    ]
+  },
+  "extensions": {
+    "shareTarget": false,
+    "fileAssociations": [
+      {
+        "description": "Portable Document Format",
+        "extensions": [
+          ".pdf"
+        ],
+        "name": "PDF document"
+      }
+    ],
+    "protocolHandlers": []
+  },
+  "signing": {
+    "pfx": null,
+    "pfxPassword": null
+  },
+  "resourceIndex": {
+    "enabled": false,
+    "keepConfig": false
+  }
+}

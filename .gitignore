@@ -5,7 +5,13 @@ Thumbs.db
 
 # Rust build artefacts
 src-tauri/target/
-src-tauri/gen/
+# Tauri 的 gen/ 基本是生成物，但 Windows 打包的**输入**是手写的（清单模板、图标、
+# bundle.config.json），必须进仓库。原来那条 `src-tauri/gen/` 是目录级排除，git 不会
+# 进入被排除的目录，所以里面的文件一个都没跟踪 —— 本地看着齐全，CI 全新检出后
+# tauri-windows-bundle 直接报 "bundle.config.json not found"。
+# 目录级排除必须换成通配符 + 反排除，git 才有机会下降进去。
+src-tauri/gen/*
+!src-tauri/gen/windows/
 
 # Pdfium binaries are fetched at build time (npm run fetch:pdfium), not committed.
 src-tauri/resources/pdfium/

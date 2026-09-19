@@ -1,3 +1,8 @@
+> ⚠️ **时效说明（2026-09-19）**：本文写于 `Rocktier-PDF-Squeeze` 独立仓库时期。
+> 该仓库已删除，压缩能力并入 `Rocktier/Rocktier-PDF`，仓库内出现的克隆地址
+> 与目录名均已成历史。**MSIX 打包流程本身仍然有效**，其配置现在位于
+> `src-tauri/gen/windows/`（见 `docs/searchable-pdf-plan.md` 同级的构建说明）。
+
 # Rocktier PDF Squeeze - Windows 构建交接文档
 
 ## 任务概述

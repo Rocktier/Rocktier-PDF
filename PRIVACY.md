@@ -46,7 +46,7 @@ The app asks the operating system for nothing beyond:
 
 The binary contains no networking code and the Tauri capability set grants no
 network permission. You can audit it yourself — the source is public at
-<https://github.com/Rocktier/Rocktier-PDF-editor>.
+<https://github.com/Rocktier/Rocktier-PDF>.
 
 If you find a request leaving this app, it is a bug. Please report it.
 

@@ -45,8 +45,8 @@ See [PRIVACY.md](PRIVACY.md).
 ## Building from source
 
 ```bash
-git clone https://github.com/Rocktier/Rocktier-PDF-editor.git
-cd Rocktier-PDF-editor
+git clone https://github.com/Rocktier/Rocktier-PDF.git
+cd Rocktier-PDF
 
 npm install          # also downloads the Pdfium build for your platform
 npm run tauri:dev    # development
