@@ -124,6 +124,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -133,8 +135,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # `gh` resolves which repository to act on from the working directory's git
+          # remote. This job only downloads artifacts, so there was no .git here and it
+          # died with "fatal: not a git repository" - after all three platform builds
+          # had already succeeded. Hence the checkout above; --repo states the target
+          # outright as well, so the intent survives any future reshuffle of steps.
+          REPO="$GITHUB_REPOSITORY"
           TAG="${GITHUB_REF_NAME}"
-          echo "Publishing $TAG"
+          echo "Publishing $TAG to $REPO"
           files=$(find artifacts -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \
                -o -name '*.msix' -o -name '*.msixbundle' \) | tr '\n' ' ')
@@ -143,9 +151,23 @@ jobs:
             echo "No installers were produced - refusing to publish an empty release." >&2
             exit 1
           fi
-          if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --title "$TAG" --notes "Automated build for $TAG"
+          if ! gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$REPO" --title "$TAG" --notes "Automated build for $TAG"
           fi
-          for i in {1..10}; do
-            gh release upload "$TAG" $files --clobber && break || sleep 5
+          # This loop used to swallow its own failure: `cmd && break || sleep` leaves the
+          # exit status at 0 when every attempt fails, so the job would report success
+          # with nothing attached. Track the outcome and fail loudly instead.
+          uploaded=0
+          for i in $(seq 1 10); do
+            if gh release upload "$TAG" $files --repo "$REPO" --clobber; then
+              uploaded=1
+              break
+            fi
+            echo "upload attempt $i failed, retrying"
+            sleep 5
           done
+          if [ "$uploaded" -ne 1 ]; then
+            echo "Uploading to $TAG failed after 10 attempts." >&2
+            exit 1
+          fi
+          echo "Attached $(echo $files | wc -w) file(s) to $TAG."
