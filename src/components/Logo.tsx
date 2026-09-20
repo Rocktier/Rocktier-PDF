@@ -79,6 +79,13 @@ export const IconSave = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+export const IconCompress = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="5.2" y="5.2" width="5.6" height="5.6" rx="0.8" />
+    <path d="M2 2.8 4.2 4.4M14 2.8 11.8 4.4M2 13.2 4.2 11.6M14 13.2 11.8 11.6" />
+  </svg>
+);
+
 export const IconMerge = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M3 2.5v4a3 3 0 0 0 3 3h4a3 3 0 0 1 3 3v3" />

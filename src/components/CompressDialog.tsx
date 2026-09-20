@@ -1,28 +1,11 @@
 import { useState } from 'react';
+import { useT } from '../i18n';
 import { pickSavePath } from '../services/engine';
 import { Modal } from './Modal';
 
-// TODO(i18n)：这三个标签与说明目前是英文常量。家族其余对话框都走 i18n，
-// 这里先落功能，随后把键补进各语言文件（键名建议 compress.profiles.{web,balanced,archive}）。
-const PROFILES = [
-  {
-    id: 'web' as const,
-    label: 'Smallest (web)',
-    desc: 'Lowest quality. For sending by mail or embedding in a web page.',
-  },
-  {
-    id: 'balanced' as const,
-    label: 'Balanced',
-    desc: 'Good quality at a much smaller size. The default.',
-  },
-  {
-    id: 'archive' as const,
-    label: 'Highest quality (archive)',
-    desc: 'Keeps more detail. Use when the document may be printed.',
-  },
-];
+export type CompressProfile = 'web' | 'balanced' | 'archive';
 
-export type CompressProfile = (typeof PROFILES)[number]['id'];
+const PROFILE_IDS: CompressProfile[] = ['web', 'balanced', 'archive'];
 
 interface CompressDialogProps {
   defaultName: string;
@@ -31,11 +14,11 @@ interface CompressDialogProps {
 }
 
 /**
- * Compress to a copy. The output path is chosen up front and shown, because
- * compression is lossy — the user should be able to see exactly which new file
- * they are about to get, and never wonder whether their original was touched.
+ * 压缩到一份副本。输出路径由用户先选并展示出来——压缩是有损操作，用户应当
+ * 清楚自己将得到哪个新文件，而不是事后怀疑原件有没有被动过。
  */
 export function CompressDialog({ defaultName, onClose, onRun }: CompressDialogProps) {
+  const t = useT();
   const [profile, setProfile] = useState<CompressProfile>('balanced');
   const [output, setOutput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +31,7 @@ export function CompressDialog({ defaultName, onClose, onRun }: CompressDialogPr
 
   const run = async () => {
     if (!output) {
-      setError('Choose where to save the compressed copy first.');
+      setError(t('compress.needOutput'));
       return;
     }
     setBusy(true);
@@ -56,37 +39,37 @@ export function CompressDialog({ defaultName, onClose, onRun }: CompressDialogPr
     const ok = await onRun(profile, output);
     setBusy(false);
     if (ok) onClose();
-    else setError('Compression failed. The original file was not modified.');
+    else setError(t('compress.failed'));
   };
 
   return (
     <Modal
-      title="Compress PDF"
+      title={t('compress.title')}
       onClose={onClose}
       footer={
         <>
           <button type="button" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('compress.cancel')}
           </button>
           <button type="button" onClick={() => void run()} disabled={busy || !output}>
-            {busy ? 'Compressing…' : 'Compress'}
+            {busy ? t('compress.busy') : t('compress.run')}
           </button>
         </>
       }
     >
       <div className="field">
-        {PROFILES.map((p) => (
-          <label key={p.id} className="row">
+        {PROFILE_IDS.map((id) => (
+          <label key={id} className="row">
             <input
               type="radio"
               name="compress-profile"
-              checked={profile === p.id}
-              onChange={() => setProfile(p.id)}
+              checked={profile === id}
+              onChange={() => setProfile(id)}
             />
             <span>
-              <strong>{p.label}</strong>
+              <strong>{t(`compress.profiles.${id}.label`)}</strong>
               <br />
-              <small>{p.desc}</small>
+              <small>{t(`compress.profiles.${id}.desc`)}</small>
             </span>
           </label>
         ))}
@@ -94,17 +77,14 @@ export function CompressDialog({ defaultName, onClose, onRun }: CompressDialogPr
 
       <div className="field">
         <button type="button" onClick={() => void chooseOutput()}>
-          Choose output…
+          {t('compress.choose')}
         </button>
-        {output ? <code>{output}</code> : <small>No destination chosen yet.</small>}
+        {output ? <code>{output}</code> : <small>{t('compress.noDestination')}</small>}
       </div>
 
       {error ? <p className="error">{error}</p> : null}
       <p>
-        <small>
-          Writes a new file. Your original is never modified, and the text layer stays
-          exactly as it was.
-        </small>
+        <small>{t('compress.note')}</small>
       </p>
     </Modal>
   );

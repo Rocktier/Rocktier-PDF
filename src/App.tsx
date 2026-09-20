@@ -471,7 +471,7 @@ export function App() {
       if (!doc) return false;
       try {
         const res = await compressDocument(doc.path, output, profile);
-        notify(t('toast.saved', { name: fileStem(res.path) + '.pdf' }));
+        notify(t('toast.compressed', { name: fileStem(res.path) + '.pdf' }));
         return true;
       } catch (e) {
         notify(String(e));

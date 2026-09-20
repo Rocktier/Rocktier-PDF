@@ -1,6 +1,7 @@
 import { useI18n, useT } from '../i18n';
 import type { AnnotTool, DocumentInfo } from '../types';
 import {
+  IconCompress,
   IconCopy,
   IconExportImages,
   IconExtract,
@@ -224,13 +225,13 @@ export function Toolbar({
       >
         <IconSign />
       </button>
-      <button className="btn btn-icon" onClick={onSecurity} disabled={!doc || busy} title={t('security.title')}>
+      <button className="btn btn-icon" onClick={onSecurity} disabled={!doc || busy} title={t('toolbar.security')}>
         <IconLock />
       </button>
-      <button className="btn btn-icon" onClick={onCompress} disabled={!doc || busy} title={t('security.title')}>
-        <IconSave />
+      <button className="btn btn-icon" onClick={onCompress} disabled={!doc || busy} title={t('toolbar.compress')}>
+        <IconCompress />
       </button>
-      <button className="btn btn-icon" onClick={onForm} disabled={!doc || busy} title={t('form.title')}>
+      <button className="btn btn-icon" onClick={onForm} disabled={!doc || busy} title={t('toolbar.fillForm')}>
         <IconForm />
       </button>
 

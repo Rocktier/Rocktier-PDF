@@ -19,6 +19,9 @@ export const en = {
     exportImages: 'To images',
     imagesToPdf: 'Images to PDF',
     sign: 'Sign',
+    security: 'Password protection',
+    compress: 'Compress',
+    fillForm: 'Fill form',
     undo: 'Undo',
     redo: 'Redo',
   },
@@ -164,8 +167,28 @@ export const en = {
     needText: 'Enter some watermark text',
   },
 
+  compress: {
+    title: 'Compress PDF',
+    mode: 'Size / quality',
+    profiles: {
+      web: { label: 'Smallest (web)', desc: 'Lowest quality. For sending by mail or embedding in a web page.' },
+      balanced: { label: 'Balanced', desc: 'Good quality at a much smaller size. The default.' },
+      archive: { label: 'Highest quality (archive)', desc: 'Keeps more detail. Use when the document may be printed.' },
+    },
+    output: 'Save as',
+    choose: 'Choose output…',
+    noDestination: 'No destination chosen yet.',
+    needOutput: 'Choose where to save the compressed copy first.',
+    cancel: 'Cancel',
+    run: 'Compress',
+    busy: 'Compressing…',
+    failed: 'Compression failed. The original file was not modified.',
+    note: 'Writes a new file. Your original is never modified, and the text layer stays exactly as it was.',
+  },
+
   toast: {
     saved: 'Saved to {name}',
+    compressed: 'Compressed to {name}',
     deleted: 'Deleted {count} page(s)',
     rotated: 'Rotated {count} page(s)',
     moved: 'Page moved',

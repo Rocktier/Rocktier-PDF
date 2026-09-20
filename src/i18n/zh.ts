@@ -21,6 +21,9 @@ export const zh: Strings = {
     exportImages: '导出图片',
     imagesToPdf: '图片转 PDF',
     sign: '签名',
+    security: '密码保护',
+    compress: '压缩',
+    fillForm: '填写表单',
     undo: '撤销',
     redo: '重做',
   },
@@ -166,8 +169,28 @@ export const zh: Strings = {
     needText: '请输入水印文字',
   },
 
+  compress: {
+    title: '压缩 PDF',
+    mode: '大小 / 画质',
+    profiles: {
+      web: { label: '最小（网页）', desc: '画质最低。适合发邮件或嵌入网页。' },
+      balanced: { label: '均衡', desc: '画质良好，体积大幅缩小。默认选项。' },
+      archive: { label: '最高画质（归档）', desc: '保留更多细节。需要打印该文档时使用。' },
+    },
+    output: '另存为',
+    choose: '选择输出位置…',
+    noDestination: '尚未选择保存位置。',
+    needOutput: '请先选择压缩后的副本保存到哪里。',
+    cancel: '取消',
+    run: '压缩',
+    busy: '正在压缩…',
+    failed: '压缩失败，原文件未被修改。',
+    note: '会写一个新文件。原文件永远不会被修改，文字层也完全保持不变。',
+  },
+
   toast: {
     saved: '已保存到 {name}',
+    compressed: '已压缩为 {name}',
     deleted: '已删除 {count} 页',
     rotated: '已旋转 {count} 页',
     moved: '页面已移动',
