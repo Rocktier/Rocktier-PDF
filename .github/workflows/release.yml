@@ -15,6 +15,21 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 直链版没有验签公钥 ⇒ **谁都激活不了**：`/api/activate` 签出的回执必须由应用
+      # 用公钥验签，公钥为空时每一份回执都会失败。把这个包发到已经在收钱的店里，是
+      # 最坏的一种安静故障，所以在这里拒绝。
+      #
+      # 两条出路，都要刻意选择：① 在 Vercel 设好 `LICENSE_PRIVATE_KEY`、并把配对的
+      # 公钥粘进 `src-tauri/src/license.rs`；② 如果这一版本就不打算卖，删掉这一步。
+      - name: Refuse to release a build that cannot activate
+        run: |
+          if grep -q 'pub const PUBLIC_KEY_B64: &str = "";' src-tauri/src/license.rs; then
+            echo "::error::PUBLIC_KEY_B64 is empty, so nobody who pays could activate this build. In rocktier.com run 'node tools/license-keygen.mjs', put the private key into Vercel as LICENSE_PRIVATE_KEY, and paste the public key into src-tauri/src/license.rs. If this release is not meant to be sold, delete this step."
+            exit 1
+          fi
+          echo "activation key is configured"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
