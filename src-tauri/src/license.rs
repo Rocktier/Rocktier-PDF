@@ -66,7 +66,7 @@ pub fn enforced() -> bool {
 /// 同源；可在 `tools/license-keygen.mjs` 生成密钥对时得到。
 ///
 /// 留空表示**尚未配置**：此时任何回执都无法通过校验，授权一律判为无效（安全侧默认）。
-pub const PUBLIC_KEY_B64: &str = "";
+pub const PUBLIC_KEY_B64: &str = "jIw3pZntprv6umUr4wFBz838/U4VvxRBHvLK08nri4M=";
 
 /// 试用状态的落盘位置（相对于应用数据目录）。文件名故意平淡，不写成 "trial"。
 const STATE_FILE: &str = "state.bin";
@@ -353,6 +353,41 @@ mod tests {
         // 商店版同理：付费由商店代收，应用里不得出现付费墙。
         if channel() == "store" {
             assert!(!enforced(), "商店版不得启用自研试用拦截（微软政策 10.8.2 / 10.8.4）");
+        }
+    }
+
+    /// 嵌进来的公钥必须是**合法**的 Ed25519 公钥。
+    ///
+    /// 守的是"手抄错误"：这个常量是人工粘贴进来的，多一个字符、少一个字符、或
+    /// base64 解出来不是 32 字节，后果都是**每一份回执都验不过** —— 而症状与"用户
+    /// 把激活码输错了"完全一样，只有付过钱的人才会发现。所以在构建期就验它。
+    ///
+    /// 留空是允许的（开发期尚未配置），此时跳过。
+    #[test]
+    fn the_embedded_public_key_parses() {
+        if PUBLIC_KEY_B64.trim().is_empty() {
+            return;
+        }
+        use base64::Engine as _;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(PUBLIC_KEY_B64.trim())
+            .expect("PUBLIC_KEY_B64 必须是合法 base64");
+        let arr: [u8; 32] = bytes.try_into().expect("Ed25519 公钥必须是 32 字节");
+        ed25519_dalek::VerifyingKey::from_bytes(&arr)
+            .expect("必须是合法的 Ed25519 公钥（一个有效的曲线点）");
+    }
+
+    /// 公钥已配、且为直链版时，闸门必须**真的开着**。
+    ///
+    /// 与前一条互补：那条防"没钥匙就开门"（把用户锁死），这条防"配了钥匙却没开门"
+    /// （试用永不到期，等于白做）。两者都是安静故障，所以两条都要有。
+    #[test]
+    fn a_configured_key_in_the_direct_channel_engages_the_gate() {
+        if !PUBLIC_KEY_B64.trim().is_empty() && channel() == "direct" {
+            assert!(
+                enforced(),
+                "公钥已配置且渠道为直链版，闸门应处于开启状态 —— 否则试用永不到期"
+            );
         }
     }
 
