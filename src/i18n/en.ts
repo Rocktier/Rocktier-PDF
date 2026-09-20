@@ -191,6 +191,8 @@ export const en = {
     invalid: 'That code was not accepted. Check it for a typo — the code is not case-sensitive.',
     wrongProduct:
       'That code belongs to a different Rocktier app. Each app has its own code — or the family bundle, which unlocks all of them.',
+    refunded:
+      'That code was refunded, so it no longer unlocks anything. If this is a mistake, write to hello@rocktier.com with your order number.',
     offline:
       'Could not reach rocktier.com. Activating needs one connection; after that the app stays offline.',
     whereToFind:

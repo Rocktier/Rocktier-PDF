@@ -45,6 +45,7 @@ export function LicenseDialog({ info, onRefresh, onClose }: LicenseDialogProps) 
       const detail = e instanceof Error ? e.message : String(e);
       if (detail === 'offline') setError(t('license.offline'));
       else if (detail.includes('WRONG_PRODUCT')) setError(t('license.wrongProduct'));
+      else if (detail.includes('REFUNDED')) setError(t('license.refunded'));
       else setError(t('license.invalid'));
     } finally {
       setBusy(false);

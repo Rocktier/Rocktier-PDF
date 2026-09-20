@@ -189,6 +189,7 @@ export const zh: Strings = {
     close: '关闭',
     invalid: '该激活码未被接受。请检查是否输错（不区分大小写）。',
     wrongProduct: '这个激活码属于另一个 Rocktier 应用。每个应用各有自己的码，或者用全家桶（可解锁全部）。',
+    refunded: '这个激活码对应的购买已退款，因此不能再解锁。如属误判，请把订单号发到 hello@rocktier.com。',
     offline: '连不上 rocktier.com。激活需要一次联网，之后便不再联网。',
     whereToFind: '付款后页面上会显示激活码，购买确认邮件里也有一份。',
     privacyNote:
