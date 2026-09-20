@@ -5,6 +5,10 @@ mod commands;
 mod compress;
 mod formclear;
 mod imagepass;
+// 授权：试用状态与回执验签。接线（commands.rs 的拦截与界面）随激活链路一起做，
+// 在此之前其中的接口暂无调用方，故整体允许未使用；接线完成后应删掉这行属性。
+#[allow(dead_code)]
+mod license;
 mod pdf;
 mod security;
 mod state;
