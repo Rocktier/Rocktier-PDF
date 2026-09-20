@@ -1,10 +1,10 @@
-# Third-party notices — Rocktier PDF Squeeze
+# Third-party notices — Rocktier PDF
 
-Rocktier PDF Squeeze is proprietary software. It **redistributes** the
-third-party components listed below, unmodified. This file and the full licence
-texts in `LICENSES/` ship inside every installer and Microsoft Store package
-(look for `resources/legal/` next to the application), so the notices travel
-with the program.
+Rocktier PDF is proprietary software. It **redistributes** the third-party
+components listed below, unmodified. This file and the full licence texts in
+`LICENSES/` ship inside every installer and Microsoft Store package (look for
+`resources/legal/` next to the application), so the notices travel with the
+program.
 
 ---
 
@@ -48,12 +48,17 @@ Two further reasons made the switch worth more than compliance:
 - **No conflict.** Apache-2.0 imposes nothing that conflicts with how this
   product is distributed.
 
-The trade-off is honest and known: qpdf has **no downsampling option**, so PDFs
-whose images are already JPEG (scans, photo catalogues) compress less than they
-did under Ghostscript. Measured on four real documents: **79–89% smaller** for
-exports carrying uncompressed image data, **4%** for an already-JPEG catalogue
-where Ghostscript reached 39% purely by reducing 200 ppi to 150 dpi. Closing
-that gap requires our own downsampler; it is tracked as the next step.
+The trade-off is honest and known: neither qpdf nor our own image pass changes
+pixel dimensions, so PDFs whose images are already JPEG (scans, photo
+catalogues) compress less than they did under Ghostscript, which reached 39% on
+such a file purely by reducing 200 ppi to 150 dpi. What our image pass does
+instead is re-encode the images qpdf leaves alone at the profile's quality — and
+that turned out to matter more than the dimensions did. Measured on three real
+documents: **51%** on a scanned catalogue, **82%** and **90%** on two papers
+whose figures were stored uncompressed. In every case the page count, the
+bookmarks and the text layer came through byte for byte — the text layer is
+asserted as such in the test suite, because "it still opens" is not the same
+claim as "nothing inside changed".
 
 ### Libraries that arrive inside the qpdf distribution
 
@@ -65,6 +70,33 @@ next to the binary; on Windows they ship as DLLs beside `qpdf.exe`.
 
 If you need any of those texts separately, we will supply them on request —
 write to **hello@rocktier.com**.
+
+---
+
+## Pdfium — the rendering engine
+
+| | |
+|---|---|
+| **Component** | Pdfium — `libpdfium.dylib` (macOS) and `pdfium.dll` (Windows), shipped in `resources/pdfium-runtime/` |
+| **Licence** | **BSD-3-Clause** for Pdfium itself, plus **Apache License 2.0** and other permissive licences for the components compiled into the same binary — full text in [`LICENSES/pdfium.txt`](LICENSES/pdfium.txt) |
+| **Copyright** | © The PDFium Authors |
+| **Upstream** | <https://pdfium.googlesource.com/pdfium> · prebuilt binaries: <https://github.com/bblanchon/pdfium-binaries> (MIT — [`LICENSES/pdfium-binaries-MIT.txt`](LICENSES/pdfium-binaries-MIT.txt)) |
+| **Version shipped** | pinned by `PDFIUM_BUILD` in `scripts/fetch-pdfium.mjs` |
+| **Modified?** | No. The library is redistributed exactly as published; we neither rebuild nor patch it. |
+
+Pdfium renders PDF pages for the viewer. It is loaded as a **dynamic library at
+runtime** — no Pdfium code is linked into the application binary.
+
+The prebuilt libraries come from the [`pdfium-binaries`](https://github.com/bblanchon/pdfium-binaries)
+project (MIT licence, © Benoit Blanchon), which builds upstream Pdfium and
+applies packaging patches to its **build files only**, not to Pdfium's sources.
+That build compiles in further components — V8, libjpeg-turbo, zlib, FreeType,
+LCMS, OpenJPEG and others — whose notices are aggregated in the upstream
+`LICENSE` file reproduced verbatim in `LICENSES/pdfium.txt`.
+
+As with the libraries inside the qpdf distribution, if you need any of those
+texts separately, we will supply them on request — write to
+**hello@rocktier.com**.
 
 ---
 
