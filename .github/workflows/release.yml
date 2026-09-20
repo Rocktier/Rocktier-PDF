@@ -143,14 +143,21 @@ jobs:
           REPO="$GITHUB_REPOSITORY"
           TAG="${GITHUB_REF_NAME}"
           echo "Publishing $TAG to $REPO"
-          files=$(find artifacts -type f \
+          # The product name contains a space ("Rocktier PDF_1.0.7_x64.msix"), so the
+          # list must never be joined into one space-separated string: word splitting
+          # cuts every path at "Rocktier" and the upload then looks for files that do
+          # not exist. Keep it NUL-delimited on disk and let xargs hand paths over.
+          find artifacts -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \
-               -o -name '*.msix' -o -name '*.msixbundle' \) | tr '\n' ' ')
-          echo "Found: $files"
-          if [ -z "$files" ]; then
+               -o -name '*.msix' -o -name '*.msixbundle' \) -print0 > installers.nul
+          count=$(tr -cd '\0' < installers.nul | wc -c)
+          echo "Found $count installer(s)"
+          if [ "$count" -eq 0 ]; then
             echo "No installers were produced - refusing to publish an empty release." >&2
             exit 1
           fi
+          tr '\0' '\n' < installers.nul | sed 's/^/  /'
+
           if ! gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
             gh release create "$TAG" --repo "$REPO" --title "$TAG" --notes "Automated build for $TAG"
           fi
@@ -159,7 +166,7 @@ jobs:
           # with nothing attached. Track the outcome and fail loudly instead.
           uploaded=0
           for i in $(seq 1 10); do
-            if gh release upload "$TAG" $files --repo "$REPO" --clobber; then
+            if xargs -0 -r gh release upload "$TAG" --repo "$REPO" --clobber < installers.nul; then
               uploaded=1
               break
             fi
@@ -170,4 +177,4 @@ jobs:
             echo "Uploading to $TAG failed after 10 attempts." >&2
             exit 1
           fi
-          echo "Attached $(echo $files | wc -w) file(s) to $TAG."
+          echo "Attached $count file(s) to $TAG."
