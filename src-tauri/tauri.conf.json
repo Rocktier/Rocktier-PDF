@@ -24,7 +24,7 @@
     }
   },
   "productName": "Rocktier PDF",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "identifier": "Rocktier.RocktierPDF",
   "app": {
     "windows": [
