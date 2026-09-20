@@ -3,9 +3,7 @@
   "publisherDisplayName": "Rocktier",
   "executableName": "RocktierPDF",
   "capabilities": {
-    "general": [
-      "internetClient"
-    ]
+    "general": []
   },
   "extensions": {
     "shareTarget": false,
