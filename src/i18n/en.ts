@@ -167,6 +167,35 @@ export const en = {
     needText: 'Enter some watermark text',
   },
 
+  license: {
+    title: 'License',
+    loading: 'Checking…',
+    trialLeft: 'Free trial — {days} day(s) left.',
+    trialChip: 'Trial · {days}d',
+    expiredChip: 'Not activated',
+    expired:
+      'Your trial has ended. Viewing and searching still work; saving and exporting need a license.',
+    licensed: 'Licensed. Thank you.',
+    licensedFamily: 'Licensed — family bundle. Every Rocktier app is unlocked.',
+    licensedNote: 'This copy is activated. No further checks, and no network access.',
+    storeNote:
+      'This copy came from the Microsoft Store, so the Store handles the license for it.',
+    notConfigured:
+      'This build cannot activate a code yet — it carries no verification key. Please write to hello@rocktier.com.',
+    codeLabel: 'Activation code',
+    codePlaceholder: 'RKT-…',
+    activate: 'Activate',
+    activating: 'Activating…',
+    buy: 'Buy — $4.99',
+    close: 'Close',
+    invalid: 'That code was not accepted. Check it for a typo — the code is not case-sensitive.',
+    offline:
+      'Could not reach rocktier.com. Activating needs one connection; after that the app stays offline.',
+    whereToFind:
+      'Your code was shown on the page right after payment, and is in the purchase email too.',
+    privacyNote:
+      'Activating sends the code to rocktier.com once and stores the signed reply locally. Nothing else is sent.',
+  },
   compress: {
     title: 'Compress PDF',
     mode: 'Size / quality',

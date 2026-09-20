@@ -197,6 +197,70 @@ export function onCompressProgress(handler: (p: CompressProgress) => void): Prom
   return listen<CompressProgress>('compress-progress', (event) => handler(event.payload));
 }
 
+/* ── Licence: trial and activation ──────────────────────────────────── */
+
+/** Mirrors `commands::LicenseInfo`. */
+export interface LicenseInfo {
+  status: 'trial' | 'expired' | 'licensed';
+  daysLeft: number;
+  product: string | null;
+  /** Whether writes are actually blocked right now (channel + key + switch). */
+  enforcing: boolean;
+  /** `direct` for the website build, `store` for the Microsoft Store build. */
+  channel: 'direct' | 'store';
+  /** False when this build has no verification key, i.e. nothing can be activated. */
+  activationConfigured: boolean;
+}
+
+/** Current trial / activation state. */
+export async function licenseStatus(): Promise<LicenseInfo> {
+  return invoke<LicenseInfo>('license_status');
+}
+
+/**
+ * Hands the server-signed receipt to Rust, which verifies it against the built-in
+ * public key and stores it. The check has to happen there: the frontend only has
+ * a string, and only the public key can tell whether it means anything.
+ */
+export async function storeReceipt(signed: string): Promise<LicenseInfo> {
+  return invoke<LicenseInfo>('store_receipt', { signed });
+}
+
+/**
+ * Exchanges an activation code for a signed receipt.
+ *
+ * The code itself is checked **on the server**, not here: verifying it locally
+ * would require shipping the signing secret inside the app, which would let
+ * anyone mint their own codes. The frontend only carries the reply to Rust.
+ */
+export async function activate(code: string): Promise<LicenseInfo> {
+  let payload: { receipt?: string; error?: string };
+  try {
+    const res = await fetch('https://rocktier.com/api/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code.trim() }),
+    });
+    payload = (await res.json()) as { receipt?: string; error?: string };
+    if (!res.ok || !payload.receipt) {
+      throw new Error(payload.error || `activation failed (${res.status})`);
+    }
+  } catch (e) {
+    // Offline is the common case here — say so instead of showing a fetch error.
+    throw new Error(
+      e instanceof Error && e.message && !e.message.includes('fetch')
+        ? e.message
+        : 'offline'
+    );
+  }
+  return storeReceipt(payload.receipt);
+}
+
+/** Fires when a write was refused because the trial ran out and nothing is activated. */
+export function onLicenseExpired(handler: () => void): Promise<() => void> {
+  return listen('license-expired', () => handler());
+}
+
 
 /* ── Import / export images ─────────────────────────────────────── */
 

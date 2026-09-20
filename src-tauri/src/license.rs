@@ -24,11 +24,43 @@ use std::path::{Path, PathBuf};
 /// 试用天数。与 `terms.html` 对公众承诺的 7 天一致（改动须同步条款）。
 pub const TRIAL_DAYS: i64 = 7;
 
-/// 是否真的拦截写操作。
+/// 是否真的拦截写操作（本模块的总开关）。
 ///
-/// **在激活链路完成前必须保持 `false`。** 翻成 `true` 的那一刻起，试用到期且未激活的
-/// 用户将无法保存/导出，因此服务端 `/api/activate`、密钥对与引导 UI 缺一不可。
-pub const ENFORCE: bool = false;
+/// 注意它**不单独决定**是否拦截 —— 还要看 `enforced()`：渠道必须是直链版、
+/// 且公钥必须已配置。这样"忘了配公钥"或"商店版误开"都不会把用户锁在门外。
+pub const ENFORCE: bool = true;
+
+/// 分发渠道。
+///
+/// **商店版与直链版必须分开**：商店版本的付费由微软代收，商店文案也声明"不启用试用"，
+/// 所以它**绝不能**带有自研付费墙 —— 否则会触发微软政策 **10.8.2**（使用第三方购买
+/// API 须在 Partner Center 申报、且须标明提供商并逐笔认证）与 **10.8.4**（须披露试用
+/// 范围与价格区间）。
+///
+/// CI 里给 MSIX 那一份构建设 `ROCKTIER_CHANNEL=store`，其余（msi / nsis / dmg）走
+/// 默认的 `direct`。**默认是 direct** 是有意的：商店包漏设这个变量会被政策卡住，
+/// 而直链包漏设只是少拦一次，前者更该被发现，所以让"漏设"表现为默认的直链。
+/// 用函数而不是 `const`：Rust 不允许在常量里对 `str` 做匹配（`cannot match on str
+/// in constants`），而 `option_env!` 的取值本就不必在编译期完成比较。
+pub fn channel() -> &'static str {
+    if option_env!("ROCKTIER_CHANNEL") == Some("store") {
+        "store"
+    } else {
+        "direct"
+    }
+}
+
+/// 是否真的启用试用拦截。三个条件同时满足才启用：
+///
+/// 1. `ENFORCE` —— 总开关；
+/// 2. 渠道是 `direct` —— 商店版由商店收款，不能带付费墙；
+/// 3. **公钥已配置** —— 未配置时**没有人能激活**，此时开启拦截等于把每一位用户
+///    在 7 天后锁死且无法解锁。这是最坏的一种失误，所以单独设一道防线。
+///
+/// 任一不满足都放行：方向刻意选**失败安全**（宁可不拦，不可锁人）。
+pub fn enforced() -> bool {
+    ENFORCE && channel() == "direct" && !PUBLIC_KEY_B64.trim().is_empty()
+}
 
 /// 服务端签名公钥（Ed25519，base64）。与 `rocktier.com` 环境变量 `LICENSE_PUBLIC_KEY`
 /// 同源；可在 `tools/license-keygen.mjs` 生成密钥对时得到。
@@ -265,6 +297,63 @@ mod tests {
         // 没配公钥的时候任何回执都不能通过。
         assert!(verify_receipt(&signed, "").is_err());
         assert!(verify_receipt("garbage", &pub_b64).is_err());
+    }
+
+    /// 与服务端对表：拿 `api/activate` **真正签出**的回执验一遍。
+    ///
+    /// 这条守的是最容易出错的那道缝 —— Node 与 Rust 之间的线格式（字段名、
+    /// base64、payload 与签名的拼接方式）。两侧各自的单元测试都看不住它：各测各的
+    /// 都对，合起来不通，而症状是"付了钱的用户激活不了"，只在真机上暴露。
+    ///
+    /// 用法：先在 rocktier.com 下跑
+    ///   node tools/activation-fixture.mjs > /tmp/activation-fixture.json
+    /// 再在本目录下跑
+    ///   ROCKTIER_ACTIVATION_FIXTURE=/tmp/activation-fixture.json cargo test activation
+    /// 未设该环境变量时跳过（CI 不依赖它）。
+    #[test]
+    fn verifies_a_receipt_minted_by_the_server() {
+        let path = match std::env::var("ROCKTIER_ACTIVATION_FIXTURE") {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        let raw = std::fs::read_to_string(&path).expect("夹具文件必须可读");
+        let v: serde_json::Value = serde_json::from_str(&raw).expect("夹具必须是 JSON");
+        let receipt = v["receipt"].as_str().expect("夹具缺少 receipt");
+        let pubkey = v["publicKey"].as_str().expect("夹具缺少 publicKey");
+        let product = v["product"].as_str().unwrap_or("");
+        let txn = v["txn"].as_str().unwrap_or("");
+
+        let got = verify_receipt(receipt, pubkey).expect("服务端签出的回执必须验得过");
+        assert_eq!(got.product, product, "回执里的产品码应与夹具一致");
+        assert_eq!(got.txn, txn, "回执里的交易号应与夹具一致");
+        assert!(got.issued_at > 0, "签发时间应是一个真实时间戳");
+
+        // 换一把公钥就不能通过（防止"签名其实没被检查"这种假通过）。
+        let other = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        let other_b64 = {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(other.verifying_key().to_bytes())
+        };
+        assert!(
+            verify_receipt(receipt, &other_b64).is_err(),
+            "换公钥后必须验不过，否则说明这条测试根本没在验签名"
+        );
+    }
+
+    /// 守最坏的那种失误：公钥没配就开启拦截 ⇒ 用户 7 天后被锁死，且没有任何办法解锁
+    /// （激活要拿回执，而没公钥就验不过任何回执）。所以只要公钥是空的，拦截就必须关闭。
+    #[test]
+    fn the_gate_cannot_engage_without_a_public_key() {
+        if PUBLIC_KEY_B64.trim().is_empty() {
+            assert!(
+                !enforced(),
+                "未配置公钥时绝不能启用拦截 —— 否则用户被锁死后无法激活"
+            );
+        }
+        // 商店版同理：付费由商店代收，应用里不得出现付费墙。
+        if channel() == "store" {
+            assert!(!enforced(), "商店版不得启用自研试用拦截（微软政策 10.8.2 / 10.8.4）");
+        }
     }
 
     #[test]

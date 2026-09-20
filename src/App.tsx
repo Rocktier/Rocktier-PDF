@@ -9,6 +9,7 @@ import { PageViewer } from './components/PageViewer';
 import { PasswordDialog } from './components/PasswordDialog';
 import { SecurityDialog } from './components/SecurityDialog';
 import { CompressDialog } from './components/CompressDialog';
+import { LicenseDialog } from './components/LicenseDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
 import { StatusBar } from './components/StatusBar';
@@ -34,11 +35,14 @@ import {
   searchDocument,
   setPassword,
     compressDocument,
+  licenseStatus,
+  onLicenseExpired,
+  type LicenseInfo,
   } from './services/engine';
 import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
-type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | null;
+type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | 'license' | null;
 
 const THEME_KEY = 'rocktier-pdf-editor.theme';
 
@@ -52,6 +56,14 @@ export function App() {
   const [current, setCurrent] = useState(0);
   const [jump, setJump] = useState<{ index: number; token: number } | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [license, setLicense] = useState<LicenseInfo | null>(null);
+
+  const refreshLicense = useCallback(() => {
+    void licenseStatus()
+      .then(setLicense)
+      // 读不到授权状态不该打断使用：按"没有状态"处理，界面就不显示胶囊。
+      .catch(() => setLicense(null));
+  }, []);
   const [dragActive, setDragActive] = useState(false);
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -145,6 +157,10 @@ export function App() {
         case 'toggle-theme':
           setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
           break;
+        case 'license':
+          setDialog('license');
+          refreshLicense();
+          break;
         case 'website':
           void openUrl('https://rocktier.com/');
           break;
@@ -165,6 +181,27 @@ export function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdf.doc, pdf.stepHistory, lang]);
+
+  /* ── License: read the trial state once, and open the dialog whenever a write
+     was refused for lack of one. Listening here rather than checking the error
+     string in every action's catch: the gate is in Rust and covers seventeen
+     commands, so a per-action check would be seventeen chances to miss one. ── */
+  useEffect(() => {
+    refreshLicense();
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void onLicenseExpired(() => {
+      setDialog('license');
+      refreshLicense();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [refreshLicense]);
 
   /* ── Keyboard shortcuts ─────────────────────────────────────── */
   useEffect(() => {
@@ -560,6 +597,11 @@ export function App() {
         busy={pdf.busy}
         error={pdf.error}
         selectedCount={pdf.selected.length}
+        license={license}
+        onLicenseClick={() => {
+          setDialog('license');
+          refreshLicense();
+        }}
       />
 
       {dialog === 'merge' ? (
@@ -577,6 +619,13 @@ export function App() {
       ) : null}
       {dialog === 'security' && doc ? (
         <SecurityDialog onClose={() => setDialog(null)} onRun={runSecurity} />
+      ) : null}
+      {dialog === 'license' ? (
+        <LicenseDialog
+          info={license}
+          onRefresh={refreshLicense}
+          onClose={() => setDialog(null)}
+        />
       ) : null}
       {dialog === 'compress' && doc ? (
         <CompressDialog

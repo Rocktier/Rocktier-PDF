@@ -62,23 +62,67 @@ jobs:
       - name: Build
         run: npm run tauri:build -- --target aarch64-apple-darwin
 
-      - name: Ad-hoc sign the app bundle and repack the DMG
+      - name: Sign the app bundle, notarize it, and repack the DMG
+        env:
+          # Add these five as repository secrets and this step switches from ad-hoc
+          # to a real Developer ID signature plus notarization, with no other change:
+          #   APPLE_CERT_P12       base64 of the Developer ID Application .p12
+          #   APPLE_CERT_PASSWORD  its password
+          #   APPLE_ID             the Apple ID that owns the certificate
+          #   APPLE_TEAM_ID        the 10-character team id
+          #   APPLE_APP_PASSWORD   an app-specific password for that Apple ID
+          # Without them the behaviour is exactly what it was before: ad-hoc, and
+          # Gatekeeper still warns about downloaded copies.
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           set -euo pipefail
           # ARM64 macOS refuses to run unadorned binaries, so the linker already
           # ad-hoc signs the executable. The bundle needs a real seal on top - and
           # the DMG needs its copy replaced: tauri packs the image from the still
           # unsigned bundle, so signing the app afterwards cannot reach inside it.
-          # A v1.0.10 downloader hit "damaged" exactly there. Replace the bundle
-          # inside the image, re-compress, then seal the image itself. `-s -` is
-          # ad-hoc: no certificate, no notarization - Gatekeeper still asks about
-          # downloaded copies; this only makes the signature a valid one.
+          # A v1.0.10 downloader hit "damaged" exactly there (release.yml used to
+          # say so). Replace the bundle inside the image, re-compress, then seal the
+          # image itself.
           app=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos \
             -maxdepth 1 -name '*.app' | head -1)
-          codesign -s - -fv --deep "$app"
-          codesign -dvvv "$app" 2>&1 | grep 'Signature=' || true
           dmg=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg \
             -name '*.dmg' | head -1)
+
+          sign_app=(-s -)
+          if [ -n "${APPLE_CERT_P12:-}" ]; then
+            # Import into a throwaway keychain. `set-key-partition-list` is what
+            # lets codesign use the key without an interactive prompt.
+            keychain="$RUNNER_TEMP/rocktier-signing.keychain-db"
+            echo "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security create-keychain -p "" "$keychain"
+            security set-keychain-settings -lut 900 "$keychain"
+            security unlock-keychain -p "" "$keychain"
+            security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
+              -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple: -k "" "$keychain" >/dev/null
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+            identity=$(security find-identity -v -p codesigning "$keychain" \
+              | awk '/Developer ID Application/ {print $2; exit}')
+            if [ -z "$identity" ]; then
+              echo "::error::APPLE_CERT_P12 is set but contains no Developer ID Application identity."
+              exit 1
+            fi
+            echo "signing as $identity"
+            # Hardened runtime is required for notarization, and the entitlements
+            # file is what lets the bundled Pdfium dylib load at all.
+            sign_app=(-s "$identity" --options runtime --entitlements src-tauri/Entitlements.plist)
+          else
+            echo "::notice::No Developer ID certificate configured - ad-hoc signing. Downloaded copies will still be flagged by Gatekeeper. See PRIVACY.md for the notarization secrets."
+          fi
+
+          codesign "${sign_app[@]}" -fv --deep "$app"
+          codesign -dvvv "$app" 2>&1 | grep 'Signature=' || true
+
           work=$(mktemp -d)
           hdiutil convert "$dmg" -format UDRW -o "$work/rw.dmg" -quiet
           mnt="$work/m"
@@ -89,9 +133,23 @@ jobs:
           hdiutil detach "$mnt" -quiet
           hdiutil convert "$work/rw.dmg" -format UDZO -o "$work/signed.dmg" -quiet
           mv "$work/signed.dmg" "$dmg"
-          codesign -s - -fv "$dmg"
-          codesign -dvvv "$dmg" 2>&1 | grep 'Signature=' || true
           rm -rf "$work"
+
+          if [ -n "${APPLE_CERT_P12:-}" ]; then
+            # Notarize the image (which covers the app inside it), then staple so
+            # the ticket travels with the file and Gatekeeper can check offline.
+            codesign -s "$identity" -fv "$dmg"
+            xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+            xcrun stapler staple "$dmg"
+            xcrun stapler validate "$dmg"
+          else
+            codesign -s - -fv "$dmg"
+          fi
+          codesign -dvvv "$dmg" 2>&1 | grep 'Signature=' || true
 
       - uses: actions/upload-artifact@v4
         with:
@@ -135,6 +193,16 @@ jobs:
         run: npm run tauri:build
 
       - name: Build MSIX (for Microsoft Store)
+        # ROCKTIER_CHANNEL=store turns off the app's own trial and activation
+        # entirely: the Store sold this copy and the Store knows it. Leaving our
+        # paywall in would pull in Microsoft's third-party-purchase rules (10.8.2)
+        # and its disclosure requirements (10.8.4) for no reason.
+        #
+        # The step above builds msi/nsis with no such variable, so those stay on
+        # the default `direct` channel. rustc records option_env! lookups in its
+        # dep-info, so changing this variable is enough to force a rebuild.
+        env:
+          ROCKTIER_CHANNEL: store
         run: npm run tauri:windows:build
 
       - uses: actions/upload-artifact@v4

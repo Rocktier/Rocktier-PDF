@@ -114,7 +114,25 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
 
     let site_i = MenuItem::with_id(app, "website", l("官方网站", "Website"), true, None::<&str>)?;
     let mail_i = MenuItem::with_id(app, "feedback", l("反馈", "Feedback"), true, None::<&str>)?;
-    let help_menu = Submenu::with_items(app, l("帮助", "Help"), true, &[&site_i, &mail_i])?;
+    // 购买页面上写着"打开应用 → License → 输入激活码"，所以应用里必须真有一个能到那儿的入口。
+    let license_i = MenuItem::with_id(
+        app,
+        "license",
+        l("许可与激活…", "License…"),
+        true,
+        None::<&str>,
+    )?;
+    let help_menu = Submenu::with_items(
+        app,
+        l("帮助", "Help"),
+        true,
+        &[
+            &license_i,
+            &PredefinedMenuItem::separator(app)?,
+            &site_i,
+            &mail_i,
+        ],
+    )?;
 
     let menu = Menu::with_items(
         app,
@@ -178,6 +196,16 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::new())
+        .setup(|app| {
+            // 授权状态的落盘目录。取不到就留空，`current_status()` 会按"不拦截"处理
+            // —— 宁可少拦一次，也不能因为一个目录取不到把用户锁在外面。
+            use tauri::Manager as _;
+            if let Ok(dir) = app.path().app_data_dir() {
+                commands::init_license_dir(dir);
+            }
+            commands::init_app_handle(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::open_document,
             commands::close_document,
@@ -204,6 +232,8 @@ fn main() {
             commands::undo,
             commands::redo,
             commands::reveal_in_finder,
+            commands::license_status,
+            commands::store_receipt,
             build_menu,
             open_url,
         

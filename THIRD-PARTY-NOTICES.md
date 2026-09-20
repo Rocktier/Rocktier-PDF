@@ -114,4 +114,6 @@ project.
 ## Your files
 
 PDFs are processed entirely on your machine. Nothing is uploaded, and the
-application makes no network requests of its own.
+application makes no network requests of its own — with one exception, described
+in `PRIVACY.md`: entering an activation code in the website build sends that code
+to `rocktier.com` once. The Microsoft Store build has no such dialog.

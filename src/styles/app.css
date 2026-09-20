@@ -648,3 +648,17 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Trial / not-activated chip in the status bar. Clickable: it is the entry point
+   to the License dialog (the site tells buyers to go to "License" in the app). */
+.license-chip {
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.license-chip:hover { border-color: var(--accent, currentColor); }
