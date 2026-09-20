@@ -17,6 +17,10 @@ src-tauri/gen/*
 src-tauri/resources/pdfium/
 src-tauri/resources/pdfium-runtime/
 
+# Licence texts are staged into resources/ by `npm run sync:legal` during the
+# build; the copies at the repository root stay the source of truth.
+src-tauri/resources/legal/
+
 *.log
 .env
 .vite/

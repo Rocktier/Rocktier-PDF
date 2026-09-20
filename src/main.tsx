@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LanguageProvider } from './i18n';
 
 import './styles/tokens.css';
@@ -12,7 +13,9 @@ if (!container) throw new Error('#root not found');
 // StrictMode is intentionally omitted: its double-invoked effects would fire
 // every page render twice in dev, which is misleading when profiling.
 createRoot(container).render(
-  <LanguageProvider>
-    <App />
-  </LanguageProvider>
+  <ErrorBoundary>
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
+  </ErrorBoundary>
 );

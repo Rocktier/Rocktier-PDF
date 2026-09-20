@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "sync:legal": "node scripts/sync-legal.mjs",
     "fetch:pdfium": "node scripts/fetch-pdfium.mjs",
     "postinstall": "node scripts/fetch-pdfium.mjs",
     "tauri": "tauri",

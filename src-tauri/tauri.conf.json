@@ -1,7 +1,7 @@
 {
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run sync:legal && npm run build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
@@ -10,7 +10,8 @@
     "targets": "all",
     "resources": [
       "resources/qpdf",
-      "resources/pdfium-runtime"
+      "resources/pdfium-runtime",
+      "resources/legal"
     ],
     "icon": [
       "icons/32x32.png",
