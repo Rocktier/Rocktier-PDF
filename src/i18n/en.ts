@@ -182,6 +182,11 @@ export const en = {
     cancel: 'Cancel',
     run: 'Compress',
     busy: 'Compressing…',
+    stages: {
+      optimize: 'Optimising the document structure…',
+      images: 'Re-encoding images…',
+      write: 'Writing the new file…',
+    },
     failed: 'Compression failed. The original file was not modified.',
     note: 'Writes a new file. Your original is never modified, and the text layer stays exactly as it was.',
   },

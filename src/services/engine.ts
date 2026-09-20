@@ -181,6 +181,22 @@ export async function removePassword(
     return invoke<PathResult>('compress_document', { input, output, profile });
   }
 
+/**
+ * Progress reported while a compression runs. `optimize` (qpdf) arrives without
+ * counts — qpdf publishes none — while `images` carries a real done/total pair,
+ * because that pass is ours and it knows how many images it is about to re-encode.
+ */
+export interface CompressProgress {
+  stage: 'optimize' | 'images' | 'write';
+  done: number | null;
+  total: number | null;
+}
+
+/** Subscribe to compression progress. Returns the usual unlisten function. */
+export function onCompressProgress(handler: (p: CompressProgress) => void): Promise<() => void> {
+  return listen<CompressProgress>('compress-progress', (event) => handler(event.payload));
+}
+
 
 /* ── Import / export images ─────────────────────────────────────── */
 

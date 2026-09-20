@@ -5,7 +5,56 @@
 //! 跳过的那一类图像（ICCBased JPEG）。详见 `PDF产品线合并方案.md` §11。
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Win32 的 `CREATE_NO_WINDOW`。
+///
+/// Windows 会给**控制台子系统**的子进程新开一个控制台窗口。本应用是 GUI 进程、
+/// 自身没有控制台，于是每次调用 `qpdf.exe` 都会弹出一个黑框：它抢焦点、遮住界面，
+/// 用户看到的是"卡了很久"，而实际上是 qpdf 在正常工作。带上这个标志，子进程就
+/// 不再分配控制台。（值出自 Win32 `CreateProcess` 的 creation flags。）
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// 起一个 qpdf 进程。Windows 上不弹控制台窗口，其余平台与从前完全一致。
+fn qpdf_command(qpdf: &Path) -> Command {
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new(qpdf);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(qpdf)
+    }
+}
+
+/// 压缩过程的进度快照。
+///
+/// qpdf **不输出任何进度信息**，所以第一阶段只能报"进行中"；第二阶段是我们自己的
+/// 逐图重编码循环，能给出真实的"已完成／总数"。`done`/`total` 同为 `None` 时表示
+/// 不定进度 —— 宁可画滚动条，也不编一个假的百分比。
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompressProgress {
+    pub stage: &'static str,
+    pub done: Option<usize>,
+    pub total: Option<usize>,
+}
+
+impl CompressProgress {
+    fn stage(stage: &'static str) -> Self {
+        Self { stage, done: None, total: None }
+    }
+
+    fn images(done: usize, total: usize) -> Self {
+        Self { stage: "images", done: Some(done), total: Some(total) }
+    }
+}
 
 /// 档位 → qpdf 的 JPEG 质量。与 `imagepass` 的口径必须一致，否则两条路径
 /// 会给出不同观感。
@@ -88,26 +137,41 @@ pub fn verify_pdf(path: &Path) -> Result<(), String> {
 /// 每一步都只在**确实更小**时才采用上一步的产物 —— 图像 pass 用 lopdf 重存
 /// 会丢掉 qpdf 生成的压缩对象流，实测有文件因此变大 1–2%，少了这道判断
 /// 就会把"压缩"做成"变大"。
-pub fn compress(input: &Path, output: &Path, profile: &str) -> Result<u64, String> {
+pub fn compress(
+    input: &Path,
+    output: &Path,
+    profile: &str,
+    on_progress: &dyn Fn(CompressProgress),
+) -> Result<u64, String> {
     let qpdf = find_qpdf()?;
 
     let staged = output.with_extension("qpdf.pdf");
     let _ = std::fs::remove_file(&staged);
-    let status = Command::new(&qpdf)
+    on_progress(CompressProgress::stage("optimize"));
+    // stderr 收进管道而不是继承：GUI 进程没有控制台可继承，而且 qpdf 的警告
+    // 正是这一层最有用的诊断信息，丢掉它就只能报一个退出码。
+    let out = qpdf_command(&qpdf)
         .args(qpdf_args(profile))
         .arg(input)
         .arg(&staged)
-        .status()
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
         .map_err(|e| format!("Failed to start qpdf: {e}"))?;
-    if !status.success() {
+    if !out.status.success() {
         let _ = std::fs::remove_file(&staged);
-        return Err(format!("qpdf exited with {:?}", status.code()));
+        let err = String::from_utf8_lossy(&out.stderr);
+        let tail = err.lines().rev().take(3).collect::<Vec<_>>().join(" / ");
+        return Err(format!("qpdf exited with {:?}: {tail}", out.status.code()));
     }
     verify_pdf(&staged)?;
 
     let after_images = output.with_extension("imgpass.pdf");
     let _ = std::fs::remove_file(&after_images);
-    if let Ok(r) = crate::imagepass::reencode_images(&staged, &after_images, profile) {
+    on_progress(CompressProgress::stage("images"));
+    let images_progress = |done: usize, total: usize| on_progress(CompressProgress::images(done, total));
+    if let Ok(r) = crate::imagepass::reencode_images(&staged, &after_images, profile, &images_progress) {
         if r.recompressed > 0 {
             let smaller = std::fs::metadata(&after_images)
                 .map(|m| m.len())
@@ -120,6 +184,7 @@ pub fn compress(input: &Path, output: &Path, profile: &str) -> Result<u64, Strin
     }
     let _ = std::fs::remove_file(&after_images);
 
+    on_progress(CompressProgress::stage("write"));
     std::fs::rename(&staged, output).map_err(|e| format!("Cannot write output: {e}"))?;
     Ok(std::fs::metadata(output).map(|m| m.len()).unwrap_or(0))
 }
@@ -184,7 +249,7 @@ mod tests {
             let _ = std::fs::remove_file(&out);
 
             let before = std::fs::metadata(&src).unwrap().len();
-            match compress(&src, &out, "balanced") {
+            match compress(&src, &out, "balanced", &|_| {}) {
                 Ok(after) => {
                     let src_doc = lopdf::Document::load(&src).ok();
                     let out_doc = lopdf::Document::load(&out).expect("产物必须可解析");

@@ -991,10 +991,14 @@ mod tests {
 
 /* ── Compression (merged in from Rocktier PDF Squeeze) ───────────── */
 
-/// 压缩一份 PDF，写出到 `output`。同步命令：Tauri 会把它放到线程池上跑，
-/// 不会阻塞 UI 线程，也就不需要为此引入 tokio 任务编排。
+/// 压缩一份 PDF，写出到 `output`。
+///
+/// 进度经 `compress-progress` 事件上报：qpdf 那一段**没有**进度可报（只能表示
+/// "进行中"），图像重压那一段报真实的 已完成／总数。UI 据此画进度而不是干等
+/// —— 一份 38 MB 的扫描件在第二段要跑几十秒，没有反馈就是"卡住了"。
 #[tauri::command]
 pub async fn compress_document(
+    app: tauri::AppHandle,
     input: String,
     output: String,
     profile: String,
@@ -1002,6 +1006,8 @@ pub async fn compress_document(
     let input_path = PathBuf::from(&input);
     let output = ensure_pdf_extension(output);
     let output_path = PathBuf::from(&output);
-    let size = crate::compress::compress(&input_path, &output_path, &profile)?;
+    let size = crate::compress::compress(&input_path, &output_path, &profile, &|p| {
+        let _ = tauri::Emitter::emit(&app, "compress-progress", &p);
+    })?;
     Ok(PathResult { path: output, size })
 }

@@ -217,9 +217,14 @@ fn encode_jpeg(img: &image::DynamicImage, quality: u8, comps: u8) -> Result<Vec<
 ///
 /// 任何单个图像的问题都只导致「跳过它」，不影响整份文档 —— 压缩器绝不能因为
 /// 一张图怪就把用户的文件弄坏。
-pub fn reencode_images(input: &Path, output: &Path, profile: &str) -> Result<ImageReport, String> {
+pub fn reencode_images(
+    input: &Path,
+    output: &Path,
+    profile: &str,
+    on_progress: &dyn Fn(usize, usize),
+) -> Result<ImageReport, String> {
     let mut doc = Document::load(input).map_err(|e| format!("Cannot open PDF: {e}"))?;
-    let report = reencode_document(&mut doc, profile);
+    let report = reencode_document(&mut doc, profile, on_progress);
     doc.save(output).map_err(|e| format!("Cannot write PDF: {e}"))?;
     Ok(report)
 }
@@ -229,10 +234,31 @@ pub fn reencode_images(input: &Path, output: &Path, profile: &str) -> Result<Ima
 /// 与文件读写分离，是为了让测试能直接喂一份内存文档：早先的写法要求先 `save`
 /// 再 `load` 回来，而合成 PDF 的往返本身就不稳（实测 4 个对象回来只剩 1 个、
 /// 字典还丢了），测试于是死在与被测逻辑无关的地方。
-pub fn reencode_document(doc: &mut Document, profile: &str) -> ImageReport {
+pub fn reencode_document(
+    doc: &mut Document,
+    profile: &str,
+    on_progress: &dyn Fn(usize, usize),
+) -> ImageReport {
     let quality = quality_for(profile);
 
     let ids: Vec<ObjectId> = doc.objects.keys().copied().collect();
+
+    // 先数一遍作为进度条的分母。这个循环在 100+ 图像的扫描件上要跑几十秒，
+    // 没有分母就只能画一个没有终点的转圈；而分母是现成的，代价只是再扫一遍
+    // 对象字典（不解码任何图像）。
+    let total = ids
+        .iter()
+        .filter(|id| {
+            doc.get_object(**id)
+                .ok()
+                .and_then(|o| o.as_stream().ok())
+                .and_then(|s| s.dict.get(b"Subtype").ok().and_then(|v| v.as_name().ok()))
+                .map(|n| n == b"Image")
+                .unwrap_or(false)
+        })
+        .count();
+    on_progress(0, total);
+
     let mut report = ImageReport::default();
 
     for id in ids {
@@ -247,6 +273,7 @@ pub fn reencode_document(doc: &mut Document, profile: &str) -> ImageReport {
             continue;
         }
         report.candidates += 1;
+        on_progress(report.candidates, total);
 
         match recompress_object(doc, id, quality, &mut report) {
             Ok(Some((before, after))) => {
@@ -320,7 +347,7 @@ mod tests {
         );
         doc.objects.insert((2, 0), Object::Stream(content));
 
-        let report = reencode_document(&mut doc, "balanced");
+        let report = reencode_document(&mut doc, "balanced", &|_, _| {});
 
         assert_eq!(report.candidates, 1, "应恰好识别出 1 张图");
         assert_eq!(report.recompressed, 1, "原始位图必须被重编码");
@@ -357,7 +384,7 @@ mod tests {
                 vec![0u8; 8],
             )),
         );
-        let r = reencode_document(&mut doc, "web");
+        let r = reencode_document(&mut doc, "web", &|_, _| {});
         assert_eq!(r.candidates, 1);
         assert_eq!(r.recompressed, 0, "图像蒙版必须原样不动");
 
@@ -380,7 +407,7 @@ mod tests {
                 vec![0u8; 8],
             )),
         );
-        let r2 = reencode_document(&mut doc2, "web");
+        let r2 = reencode_document(&mut doc2, "web", &|_, _| {});
         assert_eq!(r2.recompressed, 0, "调色板图像必须跳过");
     }
     /// 真实文件基准：只在显式给出目录时运行（CI 不跑，因为真实 PDF 不入库）。
@@ -403,7 +430,7 @@ mod tests {
         for src in entries {
             let name = src.file_name().unwrap().to_string_lossy().to_string();
             let out = out_dir.join(&name);
-            match reencode_images(&src, &out, "balanced") {
+            match reencode_images(&src, &out, "balanced", &|_, _| {}) {
                 Ok(r) => {
                     let before = std::fs::metadata(&src).unwrap().len();
                     let after = std::fs::metadata(&out).unwrap().len();

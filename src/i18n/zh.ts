@@ -184,6 +184,11 @@ export const zh: Strings = {
     cancel: '取消',
     run: '压缩',
     busy: '正在压缩…',
+    stages: {
+      optimize: '正在优化文档结构…',
+      images: '正在重压图像…',
+      write: '正在写出新文件…',
+    },
     failed: '压缩失败，原文件未被修改。',
     note: '会写一个新文件。原文件永远不会被修改，文字层也完全保持不变。',
   },
