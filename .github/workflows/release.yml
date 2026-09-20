@@ -62,6 +62,23 @@ jobs:
       - name: Build
         run: npm run tauri:build -- --target aarch64-apple-darwin
 
+      - name: Ad-hoc sign the app bundle and the DMG
+        run: |
+          set -euo pipefail
+          # ARM64 macOS refuses to run unadorned binaries, so the linker already
+          # ad-hoc signs the executable. The bundle and the disk image are a
+          # different matter, and a downloaded copy is better off carrying both
+          # seals. `-s -` is ad-hoc: no certificate, no notarization - Gatekeeper
+          # will still ask about a downloaded copy; this only seals what was built.
+          app=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos \
+            -maxdepth 1 -name '*.app' | head -1)
+          codesign -s - -fv --deep "$app"
+          codesign -dvvv "$app" 2>&1 | grep 'Signature=' || true
+          dmg=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg \
+            -name '*.dmg' | head -1)
+          codesign -s - -fv "$dmg"
+          codesign -dvvv "$dmg" 2>&1 | grep 'Signature=' || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
