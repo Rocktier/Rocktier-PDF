@@ -128,9 +128,27 @@ pub fn compress(input: &Path, output: &Path, profile: &str) -> Result<u64, Strin
 mod tests {
     use super::*;
 
+    /// 文字层抽出来做逐字节比对。用外部 `pdftotext` 而不是自己解析——抽文本的
+    /// 规则由第三方定，两边用同一个工具才是在比"是否相同"，而不是在比自己怎么读。
+    /// 本机没有 poppler 时跳过这一步，页数与书签断言仍然生效。
+    fn text_layer(path: &Path) -> Option<Vec<u8>> {
+        let out = std::process::Command::new("pdftotext")
+            .args(["-layout"])
+            .arg(path)
+            .arg("-")
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        Some(out.stdout)
+    }
+
     /// 合并后的验收：在**真实文档**上跑完整压缩路径（qpdf + 图像 pass），
-    /// 断言页数不变、书签仍在。环境变量门控，CI 不跑（真实文档不入库）。
-    ///   ROCKTIER_TEST_DIR=~/Downloads cargo test acceptance -- --nocapture
+    /// 断言页数不变、书签仍在、文字层逐字节未变。环境变量门控，CI 不跑
+    /// （真实文档不入库）。用只放这几份样本的目录跑，别直接指 Downloads——
+    /// 里面混着的 PDF 不一定能通过 poppler 抽取。
+    ///   ROCKTIER_TEST_DIR=<样本目录> cargo test acceptance -- --nocapture
     #[test]
     fn acceptance_on_real_documents() {
         let dir = match std::env::var("ROCKTIER_TEST_DIR") {
@@ -178,16 +196,26 @@ mod tests {
                     if src_doc.as_ref().map(&has_outlines).unwrap_or(false) {
                         assert!(has_outlines(&out_doc), "{name}: 书签丢了");
                     }
+
+                    // 文字层：逐字节相同。这是压缩能上"无损"这一说的唯一硬证据——
+                    // 体积和页数都容易骗人，文字抽出来一样才说明内容流没被动过。
+                    let (text_ok, text_checked) = match (text_layer(&src), text_layer(&out)) {
+                        (Some(a), Some(b)) => (a == b, true),
+                        _ => (true, false),
+                    };
+                    assert!(text_ok, "{name}: 文字层被改动了");
+
                     println!(
-                        "ACCEPT {name}: {before} -> {after} (省 {}%), 页 {pages_before}->{pages_after}",
+                        "ACCEPT {name}: {before} -> {after} (省 {}%), 页 {pages_before}->{pages_after}, 文字层 {}",
                         if before > 0 {
                             100i64 - (after as i64 * 100 / before as i64)
                         } else {
                             0
-                        }
+                        },
+                        if text_checked { "逐字节一致" } else { "未校验（pdftotext 不可用）" }
                     );
                 }
-                Err(e) => println!("ACCEPT {name}: 压缩失败 — {e}"),
+                Err(e) => panic!("ACCEPT {name}: 压缩失败 — {e}"),
             }
         }
     }
