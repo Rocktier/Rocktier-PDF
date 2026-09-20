@@ -62,22 +62,36 @@ jobs:
       - name: Build
         run: npm run tauri:build -- --target aarch64-apple-darwin
 
-      - name: Ad-hoc sign the app bundle and the DMG
+      - name: Ad-hoc sign the app bundle and repack the DMG
         run: |
           set -euo pipefail
           # ARM64 macOS refuses to run unadorned binaries, so the linker already
-          # ad-hoc signs the executable. The bundle and the disk image are a
-          # different matter, and a downloaded copy is better off carrying both
-          # seals. `-s -` is ad-hoc: no certificate, no notarization - Gatekeeper
-          # will still ask about a downloaded copy; this only seals what was built.
+          # ad-hoc signs the executable. The bundle needs a real seal on top - and
+          # the DMG needs its copy replaced: tauri packs the image from the still
+          # unsigned bundle, so signing the app afterwards cannot reach inside it.
+          # A v1.0.10 downloader hit "damaged" exactly there. Replace the bundle
+          # inside the image, re-compress, then seal the image itself. `-s -` is
+          # ad-hoc: no certificate, no notarization - Gatekeeper still asks about
+          # downloaded copies; this only makes the signature a valid one.
           app=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos \
             -maxdepth 1 -name '*.app' | head -1)
           codesign -s - -fv --deep "$app"
           codesign -dvvv "$app" 2>&1 | grep 'Signature=' || true
           dmg=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg \
             -name '*.dmg' | head -1)
+          work=$(mktemp -d)
+          hdiutil convert "$dmg" -format UDRW -o "$work/rw.dmg" -quiet
+          mnt="$work/m"
+          mkdir -p "$mnt"
+          hdiutil attach "$work/rw.dmg" -readwrite -nobrowse -mountpoint "$mnt" -quiet
+          rm -rf "$mnt/$(basename "$app")"
+          cp -R "$app" "$mnt/"
+          hdiutil detach "$mnt" -quiet
+          hdiutil convert "$work/rw.dmg" -format UDZO -o "$work/signed.dmg" -quiet
+          mv "$work/signed.dmg" "$dmg"
           codesign -s - -fv "$dmg"
           codesign -dvvv "$dmg" 2>&1 | grep 'Signature=' || true
+          rm -rf "$work"
 
       - uses: actions/upload-artifact@v4
         with:
