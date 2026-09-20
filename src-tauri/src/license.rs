@@ -71,6 +71,22 @@ pub const PUBLIC_KEY_B64: &str = "jIw3pZntprv6umUr4wFBz838/U4VvxRBHvLK08nri4M=";
 /// 试用状态的落盘位置（相对于应用数据目录）。文件名故意平淡，不写成 "trial"。
 const STATE_FILE: &str = "state.bin";
 
+/// 本应用接受的授权产品码：**本单品自己 + 全家桶**。
+///
+/// ⚠️ 不能接受"任何产品码"。回执里的产品码来自激活码（`<产品码>:<交易号>`），而家族
+/// 各单品是分别售卖的 —— 若照单全收，买一份 $4.99 的 pic2webp 就能解锁 PDF 应用，
+/// 单品定价等于失效。准则 §12.3 的原话是 `accepted_products = [本应用, 家族]`，
+/// 这里照它执行。
+///
+/// `SQ` = 本应用（PDF Squeeze 时期的产品码，价格表见 rocktier.com/api/_shared.js）；
+/// `FL` = 全家桶。
+pub const ACCEPTED_PRODUCTS: [&str; 2] = ["SQ", "FL"];
+
+/// 这份回执是否属于本应用可接受的授权。
+pub fn accepts(receipt: &Receipt) -> bool {
+    ACCEPTED_PRODUCTS.contains(&receipt.product.as_str())
+}
+
 /// 判定的结果。`days_left` 只用于界面提示，不参与是否放行的判断。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
@@ -389,6 +405,27 @@ mod tests {
                 "公钥已配置且渠道为直链版，闸门应处于开启状态 —— 否则试用永不到期"
             );
         }
+    }
+
+    /// 只有本单品与全家桶的码算授权。这条防的是一次定价失效：家族各单品单独售卖，
+    /// 若"任何产品码都收"，买一份 $4.99 的 pic2webp 就能解锁 PDF 应用。
+    #[test]
+    fn only_this_product_and_the_family_bundle_are_accepted() {
+        let make = |p: &str| Receipt {
+            product: p.into(),
+            txn: "txn_x".into(),
+            issued_at: T0,
+        };
+        assert!(accepts(&make("SQ")), "本单品的码必须接受");
+        assert!(accepts(&make("FL")), "全家桶的码必须接受");
+        for other in ["WP", "MD", "CV"] {
+            assert!(
+                !accepts(&make(other)),
+                "别的单品的码不得接受（{other}）—— 否则单品定价形同虚设"
+            );
+        }
+        assert!(!accepts(&make("")), "空产品码不得接受");
+        assert!(!accepts(&make("sq")), "产品码区分大小写（大小写不符即为非本应用）");
     }
 
     #[test]

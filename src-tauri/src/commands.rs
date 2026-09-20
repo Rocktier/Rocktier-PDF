@@ -54,7 +54,9 @@ fn current_license() -> crate::license::Status {
     };
     let now = now_secs();
     let started = crate::license::ensure_started(dir, now);
-    let receipt = crate::license::read_valid_receipt(dir, crate::license::PUBLIC_KEY_B64);
+    // 只认本单品与全家桶的回执：别人的回执即使验签通过，也不是本应用的授权。
+    let receipt = crate::license::read_valid_receipt(dir, crate::license::PUBLIC_KEY_B64)
+        .filter(crate::license::accepts);
     crate::license::status_from(started, receipt.as_ref(), now)
 }
 
@@ -131,7 +133,14 @@ pub async fn store_receipt(signed: String) -> CmdResult<LicenseInfo> {
         .get()
         .ok_or_else(|| "no app data directory".to_string())?;
     let trimmed = signed.trim();
-    crate::license::verify_receipt(trimmed, crate::license::PUBLIC_KEY_B64)?;
+    let receipt = crate::license::verify_receipt(trimmed, crate::license::PUBLIC_KEY_B64)?;
+
+    // 其它单品的码虽然签名有效，但**不属于**本应用 —— 而且不要落盘：落下去以后
+    // 会被当成有效回执读回来，等于自己给自己开后门。
+    if !crate::license::accepts(&receipt) {
+        return Err("LICENSE_WRONG_PRODUCT".to_string());
+    }
+
     crate::license::save_receipt(dir, trimmed)?;
     Ok(license_info())
 }

@@ -189,6 +189,8 @@ export const en = {
     buy: 'Buy — $4.99',
     close: 'Close',
     invalid: 'That code was not accepted. Check it for a typo — the code is not case-sensitive.',
+    wrongProduct:
+      'That code belongs to a different Rocktier app. Each app has its own code — or the family bundle, which unlocks all of them.',
     offline:
       'Could not reach rocktier.com. Activating needs one connection; after that the app stays offline.',
     whereToFind:

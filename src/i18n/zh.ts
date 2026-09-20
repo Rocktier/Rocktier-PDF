@@ -188,6 +188,7 @@ export const zh: Strings = {
     buy: '购买 — $4.99',
     close: '关闭',
     invalid: '该激活码未被接受。请检查是否输错（不区分大小写）。',
+    wrongProduct: '这个激活码属于另一个 Rocktier 应用。每个应用各有自己的码，或者用全家桶（可解锁全部）。',
     offline: '连不上 rocktier.com。激活需要一次联网，之后便不再联网。',
     whereToFind: '付款后页面上会显示激活码，购买确认邮件里也有一份。',
     privacyNote:
