@@ -167,8 +167,9 @@ export function Toolbar({
         <IconExtract />
         {t('toolbar.extract')}
       </button>
-      <button className="btn btn-icon" onClick={onCopyText} disabled={!doc || busy || !hasSelection} title={t('toolbar.copyText')}>
+      <button className="btn" onClick={onCopyText} disabled={!doc || busy || !hasSelection}>
         <IconCopy />
+        {t('toolbar.copyText')}
       </button>
       <button className="btn" onClick={onStamp} disabled={!doc || busy}>
         <IconStamp />
@@ -218,21 +219,24 @@ export function Toolbar({
         <IconNote />
       </button>
       <button
-        className={`btn btn-icon${markupTool === 'sign' ? ' active' : ''}`}
+        className={`btn${markupTool === 'sign' ? ' active' : ''}`}
         onClick={onSign}
         disabled={!doc || busy}
-        title={t('toolbar.sign')}
       >
         <IconSign />
+        {t('toolbar.sign')}
       </button>
-      <button className="btn btn-icon" onClick={onSecurity} disabled={!doc || busy} title={t('toolbar.security')}>
+      <button className="btn" onClick={onSecurity} disabled={!doc || busy}>
         <IconLock />
+        {t('toolbar.security')}
       </button>
-      <button className="btn btn-icon" onClick={onCompress} disabled={!doc || busy} title={t('toolbar.compress')}>
+      <button className="btn" onClick={onCompress} disabled={!doc || busy}>
         <IconCompress />
+        {t('toolbar.compress')}
       </button>
-      <button className="btn btn-icon" onClick={onForm} disabled={!doc || busy} title={t('toolbar.fillForm')}>
+      <button className="btn" onClick={onForm} disabled={!doc || busy}>
         <IconForm />
+        {t('toolbar.fillForm')}
       </button>
 
       <div className="toolbar-spacer" />
