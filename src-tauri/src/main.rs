@@ -5,9 +5,7 @@ mod commands;
 mod compress;
 mod formclear;
 mod imagepass;
-// 授权：试用状态与回执验签。接线（commands.rs 的拦截与界面）随激活链路一起做，
-// 在此之前其中的接口暂无调用方，故整体允许未使用；接线完成后应删掉这行属性。
-#[allow(dead_code)]
+// 授权：试用状态与回执验签。写命令的拦截在 commands.rs，界面在 LicenseDialog。
 mod license;
 mod pdf;
 mod security;
@@ -167,6 +165,14 @@ fn open_url(url: String) -> Result<(), String> {
         return Err(format!("blocked url: {url}"));
     }
 
+    // Windows 那条路径要经过 `cmd`，而 URL 是数据、不是命令行：cmd 会把 & | ^ 当作
+    // 语法解析，于是一个含 & 的 mailto 就能再起一个进程。两道收口 —— 先拒绝会破坏
+    // 引号包裹的字符，再把 URL 放进引号里（引号内 cmd 不解析元字符）。
+    // macOS 与 Linux 直接 exec，不经过 shell，没有这个问题。
+    if url.contains('"') || url.contains('\n') || url.contains('\r') {
+        return Err(format!("blocked url: {url}"));
+    }
+
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -177,7 +183,7 @@ fn open_url(url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("cmd")
-            .args(["/C", "start", "", &url])
+            .args(["/C", "start", "", &format!("\"{url}\"")])
             .spawn()
             .map_err(|e| e.to_string())?;
     }
