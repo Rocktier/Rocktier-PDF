@@ -3022,7 +3022,7 @@ dependencies = [
 
 [[package]]
 name = "rocktier-pdf-editor"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",

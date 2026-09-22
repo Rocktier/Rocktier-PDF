@@ -1,6 +1,6 @@
 [package]
 name = "rocktier-pdf-editor"
-version = "1.0.13"
+version = "1.0.14"
 description = "Edit PDFs. Fast, private, no internet needed."
 authors = ["Rocktier <hello@rocktier.com>"]
 edition = "2021"
