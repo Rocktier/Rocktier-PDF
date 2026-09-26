@@ -53,6 +53,10 @@
   fill: var(--red);
 }
 
+.brand-mark .brand-badge {
+  fill: #ffffff;
+}
+
 .brand-name {
   font-size: 12px;
   font-weight: 600;
