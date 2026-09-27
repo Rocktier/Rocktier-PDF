@@ -84,8 +84,16 @@ function Thumb({
   onDragOver,
   onDrop,
 }: ThumbProps) {
-  const { ref, inView } = useInView<HTMLDivElement>('250px');
+  const t = useT();
+  const { ref, inView } = useInView<HTMLButtonElement>('250px');
   const [rendered, setRendered] = useState<RenderedPage | null>(null);
+
+  // The active thumb must stay in view: search jumps and arrow-key navigation
+  // move the selection without scrolling the rail themselves.
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, revision]);
 
   const width = Math.round(THUMB_CSS_WIDTH * devicePixelRatioCapped());
   const size = displaySize(page, THUMB_CSS_WIDTH / Math.max(page.width, 1));
@@ -115,10 +123,13 @@ function Thumb({
   }, [inView, page.index, width, revision]);
 
   return (
-    <div
+    <button
       ref={ref}
+      type="button"
       className={`thumb${active ? ' active' : ''}${selected ? ' selected' : ''}`}
       style={{ opacity: dragging ? 0.4 : 1 }}
+      aria-pressed={active}
+      aria-label={`${t('rail.page')} ${position + 1}`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -142,6 +153,6 @@ function Thumb({
       )}
       {selected ? <span className="thumb-badge">✓</span> : null}
       <span className="thumb-label">{position + 1}</span>
-    </div>
+    </button>
   );
 }

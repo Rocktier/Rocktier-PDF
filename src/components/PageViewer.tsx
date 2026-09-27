@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
+import { useT } from '../i18n';
 import { getCached, getRender } from '../services/renderCache';
 import type { AnnotTool, MarkupRect, PageInfo, RenderedPage, SearchHit } from '../types';
 import { devicePixelRatioCapped, renderWidth } from '../utils';
@@ -18,6 +19,7 @@ interface PageViewerProps {
   onNoteAt: (page: number, x: number, y: number) => void;
   onSelect: (index: number) => void;
   onVisible: (index: number) => void;
+  onStep?: (delta: number) => void;
 }
 
 export function PageViewer({
@@ -33,9 +35,31 @@ export function PageViewer({
   onNoteAt,
   onSelect,
   onVisible,
+  onStep,
 }: PageViewerProps) {
+  const t = useT();
+
+  // Page Up/Down stay themselves; plain arrows step one page at a time. Without
+  // this a long document can only be navigated with the wheel or the rail —
+  // the reader region was invisible to both tab and keyboard.
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') {
+      e.preventDefault();
+      onStep?.(1);
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault();
+      onStep?.(-1);
+    }
+  };
+
   return (
-    <div className="viewer">
+    <div
+      className="viewer"
+      tabIndex={0}
+      role="region"
+      aria-label={t('viewer.label')}
+      onKeyDown={onKeyDown}
+    >
       <div className="viewer-inner">
         {pages.map((page, position) => (
           <Page

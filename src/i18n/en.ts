@@ -252,6 +252,20 @@ export const en = {
     badge: 'Offline',
     tooltip: 'This app makes zero network requests.',
   },
+
+  viewer: {
+    label: 'Document pages',
+  },
+
+  dialog: {
+    unsaved: {
+      title: 'Unsaved changes',
+      body: '"{name}" has changes that are not saved yet. Save them before continuing?',
+      save: 'Save',
+      discard: "Don't save",
+      cancel: 'Cancel',
+    },
+  },
 };
 
 export type Strings = typeof en;

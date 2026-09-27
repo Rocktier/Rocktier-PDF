@@ -69,13 +69,20 @@ export function CompressDialog({ defaultName, onClose, onRun }: CompressDialogPr
   const done = progress?.done ?? 0;
   const stage = progress?.stage ?? 'optimize';
 
+  // 运行中的关窗一律忽略（按钮、遮罩、Esc 同路）——中途离开会留下一份
+  // 半途状态；要取消只能等这一趟跑完。后台引擎并不支持真取消，因此这里
+  // 不给"取消"假承诺。
+  const requestClose = () => {
+    if (!busy) onClose();
+  };
+
   return (
     <Modal
       title={t('compress.title')}
-      onClose={onClose}
+      onClose={requestClose}
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={busy}>
+          <button type="button" onClick={requestClose} disabled={busy}>
             {t('compress.cancel')}
           </button>
           <button type="button" onClick={() => void run()} disabled={busy || !output}>

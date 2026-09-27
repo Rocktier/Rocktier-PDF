@@ -24,7 +24,7 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
   const label = error ?? (busy ? t('status.working') : t('status.ready'));
 
   return (
-    <div className="statusbar">
+    <div className="statusbar" role="status" aria-live="polite">
       <span className={`status-dot ${state}`} />
       <span>{label}</span>
 

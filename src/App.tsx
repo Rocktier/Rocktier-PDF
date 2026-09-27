@@ -7,6 +7,7 @@ import { MergeDialog } from './components/MergeDialog';
 import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
 import { PasswordDialog } from './components/PasswordDialog';
+import { Modal } from './components/Modal';
 import { SecurityDialog } from './components/SecurityDialog';
 import { CompressDialog } from './components/CompressDialog';
 import { LicenseDialog } from './components/LicenseDialog';
@@ -76,6 +77,10 @@ export function App() {
   const [noteAt, setNoteAt] = useState<{ page: number; x: number; y: number } | null>(null);
   const [sigPath, setSigPath] = useState<string | null>(null);
   const [pwPrompt, setPwPrompt] = useState<{ path: string; incorrect: boolean } | null>(null);
+  // 关窗 / 打开另一个文件 / 拖拽替换，三条替换路径共用一个守卫。
+  const [guard, setGuard] = useState<
+    { kind: 'close' } | { kind: 'open'; path: string; password?: string } | null
+  >(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -90,6 +95,34 @@ export function App() {
     setToast({ text, error });
     window.setTimeout(() => setToast(null), 2600);
   }, []);
+
+  // 菜单打开与拖拽共用：报告结果、需要时弹密码框。定义在拖拽监听之前 ——
+  // useEffect 的依赖数组在渲染期求值，晚于 const 声明会踩 TDZ。
+  const runOpen = useCallback(
+    async (path: string, password?: string) => {
+      const { info, error } = await pdf.openPathWithResult(path, password);
+      if (info) {
+        setCurrent(0);
+        setZoom(1);
+        setFindQuery('');
+        setHits([]);
+        setActiveHit(0);
+        notify(t('toast.opened', { name: info.name }));
+      } else if (error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT') {
+        setPwPrompt({ path, incorrect: error === 'PASSWORD_INCORRECT' });
+      }
+    },
+    [notify, pdf, t]
+  );
+
+  // 丢掉一份带未保存修改的内存文档是最贵的错误：任何替换先过守卫。
+  const requestOpen = useCallback(
+    (path: string, password?: string) => {
+      if (pdf.doc?.dirty) setGuard({ kind: 'open', path, password });
+      else void runOpen(path, password);
+    },
+    [pdf.doc?.dirty, runOpen]
+  );
 
   /* ── Drag & drop from the OS ────────────────────────────────── */
   useEffect(() => {
@@ -109,7 +142,7 @@ export function App() {
         }
         setDragActive(false);
         const path = event.payload.paths.find((p) => p.toLowerCase().endsWith('.pdf'));
-        if (path) void pdf.openPath(path);
+        if (path) requestOpen(path);
       })
       .then((fn) => {
         if (disposed) fn();
@@ -120,7 +153,7 @@ export function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [pdf.openPath]);
+  }, [requestOpen]);
 
   /* ── Native menu ────────────────────────────────────────────── */
   useEffect(() => {
@@ -220,6 +253,8 @@ export function App() {
         e.preventDefault();
         void pdf.stepHistory(e.shiftKey ? 'redo' : 'undo');
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && pdf.selected.length > 0) {
+        // 守卫对话框开着时，退格归对话框（决定保不保存），不许穿透删页。
+        if (guard) return;
         // 焦点在可编辑元素里时，退格/删除是"改字"，不是"删页"。
         // 少了这道守卫，用户在查找框、表单值或批注文字里按退格会静默删掉一整页 ——
         // 只有撤销能救回来，而用户多半不知道发生了什么。
@@ -238,7 +273,7 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf.selected, pdf.doc, pdf.stepHistory]);
+  }, [pdf.selected, pdf.doc, pdf.stepHistory, guard]);
 
   /* ── Find ───────────────────────────────────────────────────── */
   useEffect(() => {
@@ -292,23 +327,55 @@ export function App() {
     []
   );
 
+  /* ── Window close & replacement guard ────────────────────────── */
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void getCurrentWindow()
+      .onCloseRequested((event) => {
+        if (pdf.doc?.dirty) {
+          event.preventDefault();
+          setGuard({ kind: 'close' });
+        }
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [pdf.doc]);
+
+  const resolveGuard = useCallback(
+    async (choice: 'save' | 'discard') => {
+      const pending = guard;
+      if (!pending) return;
+      if (choice === 'save') {
+        const saved = await pdf.save();
+        // 保存失败就留在守卫上，绝不能静默丢掉未保存的修改。
+        if (!saved) return;
+      }
+      setGuard(null);
+      if (pending.kind === 'close') {
+        void getCurrentWindow().close();
+      } else {
+        void runOpen(pending.path, pending.password);
+      }
+    },
+    [guard, pdf, runOpen]
+  );
+
   /* ── Actions ────────────────────────────────────────────────── */
 
   const openFile = useCallback(async () => {
     const path = await pickPdf();
     if (!path) return;
-    const { info, error } = await pdf.openPathWithResult(path);
-    if (info) {
-      setCurrent(0);
-      setZoom(1);
-      setFindQuery('');
-      setHits([]);
-      setActiveHit(0);
-      notify(t('toast.opened', { name: info.name }));
-    } else if (error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT') {
-      setPwPrompt({ path, incorrect: error === 'PASSWORD_INCORRECT' });
-    }
-  }, [notify, pdf, t]);
+    requestOpen(path);
+  }, [requestOpen]);
 
   const submitPassword = useCallback(
     async (password: string) => {
@@ -485,6 +552,17 @@ export function App() {
     setJump({ index, token: Date.now() });
   }, []);
 
+  // 阅读区方向键翻页：直接算出目标页并跳转。
+  const stepPage = useCallback(
+    (delta: number) => {
+      if (!pdf.doc) return;
+      const next = Math.min(Math.max(0, current + delta), pdf.doc.pages.length - 1);
+      setCurrent(next);
+      setJump({ index: next, token: Date.now() });
+    },
+    [current, pdf.doc]
+  );
+
   const toggleSelected = useCallback(
     (index: number) => {
       const next = pdf.selected.includes(index)
@@ -574,6 +652,7 @@ export function App() {
               onNoteAt={handlePageClick}
               onSelect={toggleSelected}
               onVisible={setCurrent}
+              onStep={stepPage}
             />
             {findOpen ? (
               <FindBar
@@ -650,6 +729,36 @@ export function App() {
           onClose={() => setPwPrompt(null)}
           onSubmit={submitPassword}
         />
+      ) : null}
+      {guard ? (
+        <Modal
+          title={t('dialog.unsaved.title')}
+          onClose={() => setGuard(null)}
+          footer={
+            <>
+              <button type="button" className="btn" onClick={() => setGuard(null)}>
+                {t('dialog.unsaved.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void resolveGuard('discard')}
+              >
+                {t('dialog.unsaved.discard')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void resolveGuard('save')}
+                disabled={pdf.busy}
+              >
+                {t('dialog.unsaved.save')}
+              </button>
+            </>
+          }
+        >
+          <p>{t('dialog.unsaved.body', { name: pdf.doc?.name ?? '' })}</p>
+        </Modal>
       ) : null}
 
       {toast ? <div className={`toast${toast.error ? ' error' : ''}`}>{toast.text}</div> : null}

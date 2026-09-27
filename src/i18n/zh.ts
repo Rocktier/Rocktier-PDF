@@ -247,4 +247,18 @@ export const zh: Strings = {
     badge: '离线',
     tooltip: '本应用不发起任何网络请求。',
   },
+
+  viewer: {
+    label: '文档页面',
+  },
+
+  dialog: {
+    unsaved: {
+      title: '未保存的修改',
+      body: '"{name}" 还有未保存的修改。先保存再继续吗？',
+      save: '保存',
+      discard: '不保存',
+      cancel: '取消',
+    },
+  },
 };
