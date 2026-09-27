@@ -166,12 +166,18 @@ jobs:
           fi
           codesign -dvvv "$dmg" 2>&1 | grep 'Signature=' || true
 
+      - name: Package app.zip
+        run: |
+          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)
+          [ -z "$APP" ] && { echo "::error::.app not found"; exit 1; }
+          ditto -c -k --keepParent "$APP" "Rocktier.PDF_aarch64.app.zip"
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
           path: |
             src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+            Rocktier.PDF_aarch64.app.zip
 
   build-windows:
     name: Windows (x64)
@@ -263,7 +269,7 @@ jobs:
           # not exist. Keep it NUL-delimited on disk and let xargs hand paths over.
           find artifacts -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \
-               -o -name '*.msix' -o -name '*.msixbundle' \) -print0 > installers.nul
+               -o -name '*.msix' -o -name '*.msixbundle' -o -name '*.zip' \) -print0 > installers.nul
           count=$(tr -cd '\0' < installers.nul | wc -c)
           echo "Found $count installer(s)"
           if [ "$count" -eq 0 ]; then
