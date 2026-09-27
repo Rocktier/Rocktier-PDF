@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy - Rocktier PDF Squeeze</title>
+<title>Privacy Policy - Rocktier PDF</title>
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -32,39 +32,47 @@
 <div class="container">
 
   <h1>Privacy Policy</h1>
-  <p class="subtitle">Rocktier PDF Squeeze &mdash; Last updated: September 6, 2026</p>
+  <p class="subtitle">Rocktier PDF &mdash; Last updated: September 26, 2026</p>
 
   <h2>1. Overview</h2>
-  <p>Rocktier PDF Squeeze is a desktop PDF compression application. Your privacy is important to us. This policy explains what data we collect, how we handle your files, and what third-party services we use.</p>
+  <p>Rocktier PDF is a desktop PDF editor: it reads, searches, reorganises, annotates, signs, encrypts and compresses PDF documents on your computer. Your privacy is important to us. This policy explains what data we collect, how we handle your files, and what third-party components we use.</p>
 
   <h2>2. No Data Collection</h2>
-  <p>Rocktier PDF Squeeze <strong>does not collect, transmit, or store</strong> any personal data, usage statistics, analytics, crash reports, or any other information. The application runs entirely on your local machine.</p>
+  <p>Rocktier PDF <strong>does not collect, transmit, or store</strong> any personal data, usage statistics, analytics, crash reports, or any other information. The application runs entirely on your local machine.</p>
 
   <h2>3. File Handling</h2>
   <ul>
-    <li><strong>Local processing only:</strong> All PDF files you select are processed locally on your computer. No files are uploaded to any server.</li>
-    <li><strong>No persistence:</strong> Your selected files are not saved or remembered between sessions.</li>
-    <li><strong>Temporary files:</strong> During compression, temporary files are created in your system's cache directory. These are cleaned up automatically after compression completes, or upon cancellation.</li>
+    <li><strong>Local processing only:</strong> All documents you open are read from and written to your own file system. No files are uploaded to any server.</li>
+    <li><strong>Your files stay yours:</strong> The app works on documents in place or writes new documents where you tell it to. Nothing is synchronised, backed up, or shared by the application.</li>
+    <li><strong>Temporary files:</strong> During compression, temporary files are created in your system's cache directory. These are cleaned up automatically when compression completes, or upon cancellation.</li>
     <li><strong>No cloud storage:</strong> The application has no integration with cloud storage services.</li>
   </ul>
 
-  <h2>4. Third-Party Services</h2>
-  <p>Rocktier PDF Squeeze bundles a local copy of <strong>Ghostscript</strong>, an open-source PDF processing engine. Ghostscript runs entirely on your machine and does not communicate with any external service.</p>
+  <h2>4. Third-Party Components</h2>
+  <p>Rocktier PDF bundles the following open-source components. Each of them runs entirely on your machine and does not communicate with any external service:</p>
+  <ul>
+    <li><strong>qpdf</strong> (Apache-2.0) &mdash; used for lossless structural normalisation and image re-compression during the compress command. Only image streams and object structure are rewritten; the text layer of your document is preserved byte for byte.</li>
+    <li><strong>PDFium</strong> &mdash; used to render and search document pages.</li>
+    <li><strong>lopdf</strong> (MIT) &mdash; used to write document structure, encryption and form field values.</li>
+  </ul>
   <p>No other third-party services, SDKs, analytics frameworks, or telemetry libraries are included in the application.</p>
 
-  <h2>5. Updates</h2>
-  <p>Rocktier PDF Squeeze does not include an automatic update mechanism. Updates are distributed exclusively through the Microsoft Store and other official distribution channels. You have full control over when and whether to install updates.</p>
+  <h2>5. Purchases</h2>
+  <p>If you purchased Rocktier PDF through the Microsoft Store, the transaction is processed by Microsoft and governed by Microsoft's privacy policy. The application itself receives no payment details and no personal data from the store.</p>
 
-  <h2>6. Changes to This Policy</h2>
+  <h2>6. Updates</h2>
+  <p>Rocktier PDF does not include an automatic update mechanism. Updates are distributed exclusively through the Microsoft Store and other official distribution channels. You have full control over when and whether to install updates.</p>
+
+  <h2>7. Changes to This Policy</h2>
   <p>If this privacy policy is updated, the "Last updated" date at the top of this page will reflect the change. Since the application has no online connectivity, you can always find the latest version at this URL.</p>
 
-  <h2>7. Contact</h2>
+  <h2>8. Contact</h2>
   <p>For questions about this privacy policy, please contact:</p>
   <p><strong>Rocktier</strong><br>Email: hello@rocktier.com</p>
 
   <hr>
 
-  <p class="footer-text">Rocktier PDF Squeeze &mdash; Fast &middot; Private &middot; Light</p>
+  <p class="footer-text">Rocktier PDF &mdash; Read &middot; Sign &middot; Compress &middot; Fully offline</p>
 
 </div>
 </body>

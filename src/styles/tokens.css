@@ -28,9 +28,9 @@
   --selection: rgba(255, 255, 255, 0.15);
   --page-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
   --radius-full: 999px;
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'PingFang SC',
