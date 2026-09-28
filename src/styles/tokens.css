@@ -25,7 +25,7 @@
   --bg-card: rgba(255, 255, 255, 0.03);
   --bg-card-hover: rgba(255, 255, 255, 0.06);
   --bg-inset: rgba(255, 255, 255, 0.02);
-  --border: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.15);
   --text-primary: rgba(255, 255, 255, 0.95);
   --text-secondary: rgba(255, 255, 255, 0.72);
@@ -35,6 +35,9 @@
   --accent-glow: rgba(255, 255, 255, 0.15);
   --red: #ff4a3d;
   --dot: rgba(255, 255, 255, 0.18);
+  /* 空态点阵（家族 motif，audit 7B-1；MD/Write 同配方 20px） */
+  --dot-pattern: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  --dot-size: 20px;
   --danger: rgba(255, 74, 61, 0.9);
   --success: rgba(48, 209, 88, 0.9);
   --warn: rgba(255, 176, 46, 0.9);
@@ -67,7 +70,7 @@
   --bg-card: rgba(0, 0, 0, 0.03);
   --bg-card-hover: rgba(0, 0, 0, 0.06);
   --bg-inset: rgba(0, 0, 0, 0.02);
-  --border: rgba(0, 0, 0, 0.1);
+  --border: rgba(0, 0, 0, 0.08);
   --border-hover: rgba(0, 0, 0, 0.2);
   --text-primary: rgba(0, 0, 0, 0.92);
   --text-secondary: rgba(0, 0, 0, 0.72);
@@ -77,6 +80,9 @@
   --accent-glow: rgba(0, 0, 0, 0.12);
   --red: #e64537;
   --dot: rgba(0, 0, 0, 0.16);
+  /* 空态点阵（家族 motif，audit 7B-1；MD/Write 同配方 20px） */
+  --dot-pattern: radial-gradient(circle, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  --dot-size: 20px;
   --danger: rgba(230, 69, 55, 0.9);
   --success: rgba(34, 178, 77, 0.9);
   --warn: rgba(214, 140, 20, 0.95);
@@ -89,12 +95,15 @@
   color-scheme: light;
 }
 
+/* ── Reduced motion（家族统一方案，规范 §9）──────────────────────
+   0.01ms 保留 transitionend 事件；iteration-count 1 停无限动画。 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    transition: none !important;
-    animation: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

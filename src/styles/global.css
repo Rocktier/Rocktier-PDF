@@ -60,8 +60,6 @@ button {
   background-clip: content-box;
 }
 
-/* The dot-matrix signature pattern from the Rocktier site */
-.dot-grid {
-  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
+/* 点阵纹理由 token 对 --dot-pattern / --dot-size 提供（tokens.css），
+   空态直接 background-image: var(--dot-pattern) 引用（见 app.css .empty）。
+   原 .dot-grid 工具类无任何引用，随 audit 7B-1 移除（2026-09-28）。 */
