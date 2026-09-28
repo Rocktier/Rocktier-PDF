@@ -422,6 +422,8 @@
   gap: 18px;
   padding: 40px;
   text-align: center;
+  background-image: var(--dot-pattern);
+  background-size: var(--dot-size) var(--dot-size);
 }
 
 .empty.dragover .dropzone {
