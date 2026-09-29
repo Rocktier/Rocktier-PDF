@@ -115,7 +115,7 @@
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -249,7 +249,7 @@
   height: 16px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
   font-size: 9px;
   font-weight: 700;
   display: flex;
@@ -500,7 +500,7 @@
 
 .statusbar .status-dot.busy {
   background: var(--warn);
-  animation: pulse 1s ease-in-out infinite;
+  animation: pulse 3s ease-in-out infinite;
 }
 
 .statusbar .status-dot.error {
@@ -509,7 +509,7 @@
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.4; }
 }
 
 /* ── Modal ────────────────────────────────────────────────────── */
@@ -643,9 +643,9 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 9px 16px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
