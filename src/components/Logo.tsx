@@ -1,42 +1,16 @@
 /**
- * Rocktier letter mark: the product code (PE) on the app-icon tile, plus the
- * signature red dot. Keeping the tile dark in both themes means the mark in the
- * toolbar looks exactly like the icon in the Dock.
+ * Rocktier PDF app icon (2026-10 brand refresh). Served from /favicon.png so the
+ * mark in the toolbar is pixel-identical to the icon in the Dock / Finder.
  */
 export function Logo({ size = 24 }: { size?: number }) {
   return (
-    <svg
+    <img
       className="brand-mark"
+      src="/favicon.png"
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect className="brand-tile" x="1" y="1" width="30" height="30" rx="8.5" />
-      <text
-        className="brand-letters"
-        x="17"
-        y="17.4"
-        fontSize="12"
-        fontWeight="700"
-        letterSpacing="-0.5"
-        textAnchor="middle"
-        dominantBaseline="central"
-      >
-        PE
-      </text>
-      <circle className="brand-badge" cx="8.6" cy="8.6" r="4.6" />
-      <path
-        d="M6.6 8.7l1.4 1.4 2.4-2.7"
-        stroke="#0a0a0a"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <circle className="brand-pip" cx="25.8" cy="6.2" r="2.2" />
-    </svg>
+    />
   );
 }
 
