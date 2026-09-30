@@ -361,7 +361,11 @@ export function App() {
       }
       setGuard(null);
       if (pending.kind === 'close') {
-        void getCurrentWindow().close();
+        // 必须是 destroy() 而不是 close()：close() 会再发一次 close-requested
+        // 事件，而"不保存"并不重置后端 dirty 标志，守卫会把窗口再次拦下 ——
+        // 用户点了"不保存"也永远关不掉。destroy() 由守卫自己兜底收尾：
+        // 走到这里代表"保存/不保存"已裁决，强制关窗、不再走第二遍守卫。
+        void getCurrentWindow().destroy();
       } else {
         void runOpen(pending.path, pending.password);
       }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Closing a window with unsaved changes now actually closes when you pick
+  "Don't Save": discarding called `getCurrentWindow().close()`, which re-emits
+  the close-requested event, so the guard blocked the window again and the
+  user could never exit. The guard now force-closes via `destroy()`.
 - Save As now updates the document name and size in the status bar instead of
   leaving the previous file's name on screen.
 - "Reveal in File Explorer" selects the file instead of opening the default
