@@ -253,6 +253,7 @@ jobs:
       - name: Attach installers to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUIRED_ASSETS: '\.dmg$ \.app\.zip$ \.msi$ \.exe$ \.msix$ \.msixbundle$'
         run: |
           set -euo pipefail
           # `gh` resolves which repository to act on from the working directory's git
@@ -279,7 +280,7 @@ jobs:
           tr '\0' '\n' < installers.nul | sed 's/^/  /'
 
           if ! gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
-            gh release create "$TAG" --repo "$REPO" --title "$TAG" --notes "Automated build for $TAG"
+            gh release create "$TAG" --repo "$REPO" --draft --title "$TAG" --notes "Automated build for $TAG"
           fi
           # This loop used to swallow its own failure: `cmd && break || sleep` leaves the
           # exit status at 0 when every attempt fails, so the job would report success
@@ -298,3 +299,18 @@ jobs:
             exit 1
           fi
           echo "Attached $count file(s) to $TAG."
+          # 发布闸门：校验 5 包齐全才发布为 latest；不齐保留草稿并失败。
+          assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+          missing=0
+          for pat in $REQUIRED_ASSETS; do
+            if ! printf '%s\n' "$assets" | grep -Eq "$pat"; then
+              echo "::error::release $TAG missing asset matching $pat"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::release $TAG is missing required assets — left as DRAFT for manual review"
+            exit 1
+          fi
+          echo "All required assets present; publishing $TAG"
+          gh release edit "$TAG" --repo "$REPO" --draft=false --latest
