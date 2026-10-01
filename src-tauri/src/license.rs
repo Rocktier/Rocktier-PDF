@@ -78,7 +78,9 @@ const STATE_FILE: &str = "state.bin";
 /// 单品定价等于失效。准则 §12.3 的原话是 `accepted_products = [本应用, 家族]`，
 /// 这里照它执行。
 ///
-/// `SQ` = 本应用（PDF Squeeze 时期的产品码，价格表见 rocktier.com/api/_shared.js）；
+/// `SQ` = 本应用的在售单品码。名字沿用 PDF Squeeze 时期，**但它就是 PDF 自己的码**：
+/// 官网价格表 `rocktier.com/api/_shared.js` 里 PDF 单品的 price id 映射的就是 `SQ`，
+/// 已发出去的回执里也写着 `SQ`。删掉它会锁死所有已付费用户 —— 只能改注释，不能改这个码。
 /// `FL` = 全家桶。
 pub const ACCEPTED_PRODUCTS: [&str; 2] = ["SQ", "FL"];
 
