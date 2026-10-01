@@ -300,15 +300,28 @@ jobs:
           fi
           echo "Attached $count file(s) to $TAG."
           # 发布闸门：校验 5 包齐全才发布为 latest；不齐保留草稿并失败。
-          assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+          # GitHub 资产 API 上传后可能延迟可见，轮询最多 ~10 分钟再下结论。
+          sleep 20
           missing=0
-          for pat in $REQUIRED_ASSETS; do
-            if ! printf '%s\n' "$assets" | grep -Eq "$pat"; then
-              echo "::error::release $TAG missing asset matching $pat"
-              missing=1
-            fi
+          for i in $(seq 1 30); do
+            assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null || true)
+            missing=0
+            for pat in $REQUIRED_ASSETS; do
+              if ! printf '%s\n' "$assets" | grep -Eq "$pat"; then
+                missing=1
+              fi
+            done
+            [ "$missing" -eq 0 ] && break
+            echo "  waiting for uploads ($i/30)..."
+            sleep 20
           done
           if [ "$missing" -ne 0 ]; then
+            assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null || true)
+            for pat in $REQUIRED_ASSETS; do
+              if ! printf '%s\n' "$assets" | grep -Eq "$pat"; then
+                echo "::error::release $TAG missing asset matching $pat"
+              fi
+            done
             echo "::error::release $TAG is missing required assets — left as DRAFT for manual review"
             exit 1
           fi
