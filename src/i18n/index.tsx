@@ -6,18 +6,28 @@ import { zh } from './zh';
 export type Lang = 'en' | 'zh';
 
 const DICTS = { en, zh } as const;
-const STORAGE_KEY = 'rocktier-pdf-editor.lang';
+// 命名空间前缀（原值为 PDF Editor 旧名残留）
+const STORAGE_KEY = 'rocktier.pdf.lang';
 
 type Vars = Record<string, string | number>;
 
-function lookup(dict: unknown, path: string): string {
+function lookup(dict: unknown, path: string): string | undefined {
   const value = path.split('.').reduce<unknown>((acc, k) => {
     if (acc && typeof acc === 'object' && k in (acc as object)) {
       return (acc as Record<string, unknown>)[k];
     }
     return undefined;
   }, dict);
-  return typeof value === 'string' ? value : path;
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** 当前语言 → en 兜底 → key。缺键绝不能把 "tool.compress.title" 这种路径直接吐给用户。 */
+function resolve(lang: Lang, path: string): string {
+  const hit = lookup(DICTS[lang], path) ?? lookup(DICTS.en, path);
+  if (hit === undefined && (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.error(`[i18n] missing key: ${path}`);
+  }
+  return hit ?? path;
 }
 
 function interpolate(template: string, vars?: Vars): string {
@@ -36,7 +46,7 @@ interface LangContextValue {
 const LangContext = createContext<LangContextValue>({
   lang: 'en',
   setLang: () => {},
-  t: (p, v) => interpolate(lookup(en, p), v),
+  t: (p, v) => interpolate(resolve('en', p), v),
 });
 
 /** English is the default: the product targets an international audience.
@@ -68,7 +78,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLang = useCallback((next: Lang) => setLangState(next), []);
 
   const t = useCallback(
-    (path: string, vars?: Vars) => interpolate(lookup(DICTS[lang], path), vars),
+    (path: string, vars?: Vars) => interpolate(resolve(lang, path), vars),
     [lang]
   );
 
