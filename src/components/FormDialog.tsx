@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
+import { useDialogA11y } from '../hooks/useDialog';
 import { listFormFields, setFormValues } from '../services/engine';
 import type { FormFieldInfo, DocumentInfo } from '../types';
 
@@ -12,6 +13,7 @@ interface FormDialogProps {
 /** Lists every fillable AcroForm field and writes the edits back. */
 export function FormDialog({ onClose, onApplied }: FormDialogProps) {
   const t = useT();
+  const { overlayProps, dialogProps } = useDialogA11y(onClose);
   const [fields, setFields] = useState<FormFieldInfo[]>([]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -56,8 +58,8 @@ export function FormDialog({ onClose, onApplied }: FormDialogProps) {
   const editable = (kind: string) => kind === 'text' || kind === 'checkbox' || kind === 'radio';
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" {...overlayProps}>
+      <div className="modal" {...dialogProps} aria-label={t('form.title')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('form.title')}</h3>
         </div>

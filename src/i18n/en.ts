@@ -141,6 +141,7 @@ export const en = {
     hint: 'Click on the page to place the stamp',
     done: 'Stamp placed',
     disclaimer: 'This is an image stamp only — not a cryptographic digital signature and carries no legal validity.',
+    tooltip: 'Visual stamp only — no cryptographic digital signature.',
   },
 
   note: {

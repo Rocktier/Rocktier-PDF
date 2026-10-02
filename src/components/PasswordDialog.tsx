@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
+import { useDialogA11y } from '../hooks/useDialog';
 
 interface PasswordDialogProps {
   /** True when a password was already tried and rejected. */
@@ -12,6 +13,7 @@ interface PasswordDialogProps {
 /** Prompt for the password of an encrypted PDF. */
 export function PasswordDialog({ incorrect, onClose, onSubmit }: PasswordDialogProps) {
   const t = useT();
+  const { overlayProps, dialogProps } = useDialogA11y(onClose);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(incorrect);
@@ -25,10 +27,12 @@ export function PasswordDialog({ incorrect, onClose, onSubmit }: PasswordDialogP
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay" {...overlayProps}>
       <div
         className="modal"
         style={{ width: 'min(380px, 92vw)' }}
+        {...dialogProps}
+        aria-label={t('password.title')}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

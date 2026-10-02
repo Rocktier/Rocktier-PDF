@@ -19,6 +19,12 @@ export interface DocumentInfo {
   /** True when there are unsaved edits. */
   dirty: boolean;
   pages: PageInfo[];
+  /**
+   * Always `false` today: signatures this app places are visual image stamps,
+   * not cryptographic digital signatures (P0-15). The UI must keep saying so
+   * until a real digital-signature feature exists.
+   */
+  hasCryptographicSignature: boolean;
 }
 
 export interface RenderedPage {

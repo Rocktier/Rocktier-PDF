@@ -36,15 +36,23 @@ export function usePdf() {
   // to re-fetch, even when a page keeps the same index.
   const [revision, setRevision] = useState(0);
 
-  /** Wraps an async command with busy + error handling. */
-  const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+  /**
+   * Wraps an async command with busy + error handling.
+   *
+   * The error message travels with the result instead of being swallowed:
+   * callers that talk to the user (toasts, dialogs) need the *reason*, not
+   * just a null — reporting "deleted N pages" after a failed delete is a lie
+   * (B-7 修复). `error` is also mirrored into the status bar via `setError`.
+   */
+  const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<{ value: T | null; error: string | null }> => {
     setBusy(true);
     setError(null);
     try {
-      return await fn();
+      return { value: await fn(), error: null };
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return null;
+      const message = e instanceof Error ? e.message : String(e);
+      setError(message);
+      return { value: null, error: message };
     } finally {
       setBusy(false);
     }
@@ -75,7 +83,7 @@ export function usePdf() {
 
   const openPath = useCallback(
     async (path: string, password?: string) => {
-      const info = await run(() => openDocument(path, password));
+      const { value: info } = await run(() => openDocument(path, password));
       if (info) applyDoc(info);
       return info;
     },
@@ -113,40 +121,46 @@ export function usePdf() {
   }, [run]);
 
   const save = useCallback(async () => {
-    const result = await run(() => saveDocument(null));
+    const { value: result } = await run(() => saveDocument(null));
     if (result) adoptSaved(result);
     return result?.path ?? null;
   }, [adoptSaved, run]);
 
   const saveAs = useCallback(
     async (path: string) => {
-      const result = await run(() => saveDocument(path));
+      const { value: result } = await run(() => saveDocument(path));
       if (result) adoptSaved(result);
       return result?.path ?? null;
     },
     [adoptSaved, run]
   );
 
-  const removePages = useCallback(async () => {
-    if (selected.length === 0) return;
-    const info = await run(() => deletePages(selected));
+  /**
+   * Deletes the selected pages and reports the outcome, so the UI can tell
+   * "deleted N pages" apart from "the delete failed".
+   */
+  const removePages = useCallback(async (): Promise<{ ok: boolean; error: string | null }> => {
+    if (selected.length === 0) return { ok: false, error: null };
+    const { value: info, error } = await run(() => deletePages(selected));
     if (info) applyDoc(info);
+    return { ok: info !== null, error };
   }, [applyDoc, run, selected]);
 
   /** With nothing selected, rotate the page the user is actually looking at. */
   const rotate = useCallback(
-    async (degrees: number, fallbackIndex = 0) => {
+    async (degrees: number, fallbackIndex = 0): Promise<{ ok: boolean; error: string | null }> => {
       const target = selected.length > 0 ? selected : doc ? [fallbackIndex] : [];
-      if (target.length === 0) return;
-      const info = await run(() => rotatePages(target, degrees));
+      if (target.length === 0) return { ok: false, error: null };
+      const { value: info, error } = await run(() => rotatePages(target, degrees));
       if (info) applyDoc(info);
+      return { ok: info !== null, error };
     },
     [applyDoc, doc, run, selected]
   );
 
   const move = useCallback(
     async (from: number, to: number) => {
-      const info = await run(() => movePage(from, to));
+      const { value: info } = await run(() => movePage(from, to));
       if (info) applyDoc(info);
     },
     [applyDoc, run]
@@ -154,7 +168,7 @@ export function usePdf() {
 
   const extract = useCallback(
     async (indices: number[], outputPath: string) => {
-      const result = await run(() => extractPages(indices, outputPath));
+      const { value: result } = await run(() => extractPages(indices, outputPath));
       return result?.path ?? null;
     },
     [run]
@@ -162,7 +176,7 @@ export function usePdf() {
 
   const merge = useCallback(
     async (paths: string[], outputPath: string) => {
-      const result = await run(() => mergeDocuments(paths, outputPath));
+      const { value: result } = await run(() => mergeDocuments(paths, outputPath));
       return result?.path ?? null;
     },
     [run]
@@ -170,24 +184,34 @@ export function usePdf() {
 
   const split = useCallback(
     async (outputDir: string, mode: SplitMode) => {
-      const result = await run(() => splitDocument(outputDir, mode));
+      const { value: result } = await run(() => splitDocument(outputDir, mode));
       return result?.map((r) => r.path) ?? [];
     },
     [run]
   );
 
+  /**
+   * Applies the stamp and reports the outcome. The dialog that invoked it
+   * surfaces `error` in its own error UI instead of closing silently.
+   */
   const stamp = useCallback(
-    async (kind: StampKind, text: string, fontSize: number, margin: number, opacity: number) => {
-      const info = await run(() => stampDocument(kind, text, fontSize, margin, opacity));
+    async (
+      kind: StampKind,
+      text: string,
+      fontSize: number,
+      margin: number,
+      opacity: number
+    ): Promise<{ info: DocumentInfo | null; error: string | null }> => {
+      const { value: info, error } = await run(() => stampDocument(kind, text, fontSize, margin, opacity));
       if (info) applyDoc(info);
-      return info;
+      return { info, error };
     },
     [applyDoc, run]
   );
 
   const markup = useCallback(
     async (kind: MarkupKind, rect: MarkupRect, color: [number, number, number], opacity: number) => {
-      const info = await run(() => addMarkup(kind, rect, color, opacity));
+      const { value: info } = await run(() => addMarkup(kind, rect, color, opacity));
       if (info) applyDoc(info);
       return info;
     },
@@ -196,7 +220,7 @@ export function usePdf() {
 
   const note = useCallback(
     async (page: number, x: number, y: number, text: string, color: [number, number, number]) => {
-      const info = await run(() => addNote(page, x, y, text, color));
+      const { value: info } = await run(() => addNote(page, x, y, text, color));
       if (info) applyDoc(info);
       return info;
     },
@@ -205,7 +229,7 @@ export function usePdf() {
 
   const signature = useCallback(
     async (page: number, x: number, y: number, width: number, imagePath: string) => {
-      const info = await run(() => addSignature(page, x, y, width, imagePath));
+      const { value: info } = await run(() => addSignature(page, x, y, width, imagePath));
       if (info) applyDoc(info);
       return info;
     },

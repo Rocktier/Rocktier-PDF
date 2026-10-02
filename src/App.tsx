@@ -412,15 +412,19 @@ export function App() {
 
   const removeSelected = useCallback(async () => {
     const count = pdf.selected.length;
-    await pdf.removePages();
-    if (count > 0) notify(t('toast.deleted', { count }));
+    if (count === 0) return;
+    const { ok, error } = await pdf.removePages();
+    // 成功才报"已删除"；失败把根因弹成错误 toast，绝不谎报成功。
+    if (ok) notify(t('toast.deleted', { count }));
+    else if (error) notify(error, true);
   }, [notify, pdf, t]);
 
   const rotateSelected = useCallback(
     async (degrees: number) => {
       const count = pdf.selected.length || 1;
-      await pdf.rotate(degrees, current);
-      notify(t('toast.rotated', { count }));
+      const { ok, error } = await pdf.rotate(degrees, current);
+      if (ok) notify(t('toast.rotated', { count }));
+      else if (error) notify(error, true);
     },
     [current, notify, pdf, t]
   );
@@ -453,8 +457,10 @@ export function App() {
 
   const applyStamp = useCallback(
     async (kind: StampKind, text: string, fontSize: number, margin: number, opacity: number) => {
-      const info = await pdf.stamp(kind, text, fontSize, margin, opacity);
+      const { info, error } = await pdf.stamp(kind, text, fontSize, margin, opacity);
       if (info) notify(t('stamp.done'));
+      // 失败要抛回给 StampDialog：它的错误 UI 会显示原因，而不是静默 onClose。
+      if (error) throw new Error(error);
     },
     [notify, pdf, t]
   );

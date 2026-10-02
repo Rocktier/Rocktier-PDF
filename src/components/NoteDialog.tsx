@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
+import { useDialogA11y } from '../hooks/useDialog';
 
 interface NoteDialogProps {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface NoteDialogProps {
 /** Small dialog for typing the body of a sticky note. */
 export function NoteDialog({ onClose, onRun }: NoteDialogProps) {
   const t = useT();
+  const { overlayProps, dialogProps } = useDialogA11y(onClose);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +33,8 @@ export function NoteDialog({ onClose, onRun }: NoteDialogProps) {
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" {...overlayProps}>
+      <div className="modal" {...dialogProps} aria-label={t('note.title')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('note.title')}</h3>
         </div>

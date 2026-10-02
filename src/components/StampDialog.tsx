@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
+import { useDialogA11y } from '../hooks/useDialog';
 import type { StampKind } from '../types';
 
 interface StampDialogProps {
@@ -16,6 +17,7 @@ interface StampDialogProps {
 /** Page numbers + text watermark, both applied to every page. */
 export function StampDialog({ onClose, onRun }: StampDialogProps) {
   const t = useT();
+  const { overlayProps, dialogProps } = useDialogA11y(onClose);
   const [kind, setKind] = useState<StampKind>('pageNumbers');
   const [text, setText] = useState('');
   const [fontSize, setFontSize] = useState(48);
@@ -42,8 +44,8 @@ export function StampDialog({ onClose, onRun }: StampDialogProps) {
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" {...overlayProps}>
+      <div className="modal" {...dialogProps} aria-label={t('stamp.title')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('stamp.title')}</h3>
         </div>

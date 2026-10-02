@@ -222,6 +222,8 @@ export function Toolbar({
         className={`btn${markupTool === 'sign' ? ' active' : ''}`}
         onClick={onSign}
         disabled={!doc || busy}
+        // P0-15：功能入口处如实声明这是视觉图章，不是数字签名。
+        title={t('sign.tooltip')}
       >
         <IconSign />
         {t('toolbar.sign')}

@@ -143,6 +143,7 @@ export const zh: Strings = {
     hint: '在页面上点击放置印章',
     done: '已放置印章',
     disclaimer: '仅为图片印章，不是密码学数字签名，不具备法律效力。',
+    tooltip: '仅为视觉图章 —— 无数字签名。',
   },
 
   note: {

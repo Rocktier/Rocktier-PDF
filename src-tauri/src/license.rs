@@ -166,12 +166,24 @@ pub fn read_started_at(dir: &Path) -> Option<i64> {
 }
 
 /// 确保存在起始时间戳，没有就写入当前时间并返回它。
+///
+/// 落盘失败**不能**返回 `None`：`status_from` 会把 `None` 判成 `Expired`，
+/// 于是"state 文件一次都写不出去"的新用户在第一天就会被锁死（B-7-1）。
+/// 失败方向刻意选**放行** —— 与 `commands.rs::current_license` 的"目录取不到
+/// 按放行"同一条准则：宁可多给一段试用，不能把人锁在门外。
 pub fn ensure_started(dir: &Path, now: i64) -> Option<i64> {
     if let Some(existing) = read_started_at(dir) {
         return Some(existing);
     }
-    std::fs::create_dir_all(dir).ok()?;
-    std::fs::write(dir.join(STATE_FILE), now.to_string()).ok()?;
+    if let Err(e) = std::fs::create_dir_all(dir) {
+        eprintln!("license: cannot create state dir {}: {e}", dir.display());
+        return Some(now);
+    }
+    let path = dir.join(STATE_FILE);
+    if let Err(e) = std::fs::write(&path, now.to_string()) {
+        eprintln!("license: cannot write trial state {}: {e}", path.display());
+        return Some(now);
+    }
     Some(now)
 }
 
@@ -209,9 +221,26 @@ pub fn verify_receipt(signed: &str, public_key_b64: &str) -> Result<Receipt, Str
 }
 
 /// 保存回执（连签名一起存，验签时不需要重新联网）。返回落盘路径。
+///
+/// 回执等于一张长期有效的许可证，按私密凭据对待：Unix 上以 0600 创建，
+/// 同机的其他账户读不走；Windows 沿用该账户的默认 ACL。
 pub fn save_receipt(dir: &Path, signed: &str) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let path = dir.join("receipt.txt");
+    #[cfg(unix)]
+    {
+        use std::io::Write as _;
+        use std::os::unix::fs::OpenOptionsExt as _;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| e.to_string())?;
+        file.write_all(signed.as_bytes()).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(unix))]
     std::fs::write(&path, signed).map_err(|e| e.to_string())?;
     Ok(path)
 }
@@ -238,6 +267,22 @@ mod tests {
         assert_eq!(first, T0, "首次启动应写入当前时间");
         let second = ensure_started(&dir, T0 + 3 * DAY).unwrap();
         assert_eq!(second, T0, "再次启动不得重置起始时间（否则试用永远不过期）");
+    }
+
+    /// B-7-1：落盘失败（目录建不出来）也必须返回起始时间 —— 若返回 `None`，
+    /// `status_from` 会判 `Expired`，新用户第一天就被锁死，连一次保存都做不了。
+    /// 失败安全：宁可多给试用，不锁人。
+    #[test]
+    fn an_unwritable_state_dir_still_starts_the_trial() {
+        // 用一个普通文件占住路径：对它 create_dir_all 必然失败，且无需 root 权限。
+        let blocker = std::env::temp_dir().join(format!("rt-license-block-{}", std::process::id()));
+        let _ = std::fs::remove_file(&blocker);
+        std::fs::write(&blocker, "not a directory").unwrap();
+
+        let started = ensure_started(&blocker.join("state"), T0);
+        assert_eq!(started, Some(T0), "写失败也必须返回起始时间，绝不能返回 None");
+
+        let _ = std::fs::remove_file(&blocker);
     }
 
     #[test]
@@ -448,6 +493,16 @@ mod tests {
 
         save_receipt(&dir, &signed).unwrap();
         assert_eq!(read_valid_receipt(&dir, &pub_b64).unwrap(), receipt);
+        // 回执是长期凭据，落盘必须只有属主可读写（B-7-2）。
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(dir.join("receipt.txt"))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o600, "回执文件必须是 0600");
+        }
         // 公钥不对时读不回来（回执被换产品/换密钥签的都会落到这里）。
         let other = SigningKey::from_bytes(&[9u8; 32]);
         let other_b64 = engine.encode(other.verifying_key().to_bytes());

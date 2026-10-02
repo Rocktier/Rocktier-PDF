@@ -44,6 +44,10 @@ pub struct DocumentInfo {
     pub file_size: u64,
     pub dirty: bool,
     pub pages: Vec<PageInfo>,
+    /// 恒为 `false`：本产品放置的签名是**视觉图片图章**，不是密码学数字签名
+    /// （P0-15）。字段随文档状态上报给前端，供界面如实声明，绝不能在签名功能
+    /// 真正做数字签名之前翻转成 `true`。
+    pub has_cryptographic_signature: bool,
 }
 
 #[derive(Serialize)]
@@ -190,6 +194,7 @@ pub fn doc_info(doc: &PdfDocument, path: &str, dirty: bool) -> Result<DocumentIn
         file_size,
         dirty,
         pages: page_infos(doc)?,
+        has_cryptographic_signature: false,
     })
 }
 

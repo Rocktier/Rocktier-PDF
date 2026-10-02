@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '../i18n';
+import { useDialogA11y } from '../hooks/useDialog';
 
 type Mode = 'set' | 'remove';
 
@@ -11,6 +12,7 @@ interface SecurityDialogProps {
 /** Set or remove a PDF's password protection (writes a *copy*). */
 export function SecurityDialog({ onClose, onRun }: SecurityDialogProps) {
   const t = useT();
+  const { overlayProps, dialogProps } = useDialogA11y(onClose);
   const [mode, setMode] = useState<Mode>('set');
   const [password, setPassword] = useState('');
   const [owner, setOwner] = useState('');
@@ -35,8 +37,14 @@ export function SecurityDialog({ onClose, onRun }: SecurityDialogProps) {
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 'min(440px, 92vw)' }} onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" {...overlayProps}>
+      <div
+        className="modal"
+        style={{ width: 'min(440px, 92vw)' }}
+        {...dialogProps}
+        aria-label={t('security.title')}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h3>{t('security.title')}</h3>
         </div>
