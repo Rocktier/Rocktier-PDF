@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "tauri:windows:build": "tauri-windows-bundle build --runner npm"
+    "tauri:windows:build": "tauri-windows-bundle build --runner npm",
+    "family:check": "node scripts/family-check.mjs --self --product pdf"
   },
   "dependencies": {
     "react": "^18.3.1",
