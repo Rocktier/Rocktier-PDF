@@ -720,8 +720,8 @@ export function App() {
       {dialog === 'form' && doc ? (
         <FormDialog
           onClose={() => setDialog(null)}
-          onApplied={() => {
-            pdf.refresh();
+          onApplied={(info) => {
+            pdf.applyDoc(info);
             notify(t('form.done'));
           }}
         />

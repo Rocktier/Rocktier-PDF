@@ -16,8 +16,10 @@ const MAX_ENTRIES = 160;
 const cache = new Map<string, RenderedPage>();
 const inflight = new Map<string, Promise<RenderedPage>>();
 
+let generation = 0;
+
 function key(index: number, width: number): string {
-  return `${index}@${width}`;
+  return `${generation}@${index}@${width}`;
 }
 
 /** Simple FIFO eviction — good enough and never surprises the user mid-scroll. */
@@ -60,6 +62,8 @@ export function getRender(index: number, width: number): Promise<RenderedPage> {
 
 /** Call after any mutation that changes page content or order. */
 export function clearRenderCache(): void {
+  // 升一代：丢弃在途渲染结果，避免上一个文档的页面被写进当前文档缓存（P0-9）
+  generation += 1;
   cache.clear();
   inflight.clear();
 }

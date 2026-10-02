@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import { listFormFields, setFormValues } from '../services/engine';
-import type { FormFieldInfo } from '../types';
+import type { FormFieldInfo, DocumentInfo } from '../types';
 
 interface FormDialogProps {
   onClose: () => void;
-  /** Called after a successful write so the viewer can refresh. */
-  onApplied: () => void;
+  /** Called after a successful write so the viewer can adopt the new doc state. */
+  onApplied: (info: DocumentInfo) => void;
 }
 
 /** Lists every fillable AcroForm field and writes the edits back. */
@@ -43,8 +43,8 @@ export function FormDialog({ onClose, onApplied }: FormDialogProps) {
     setBusy(true);
     setError(null);
     try {
-      await setFormValues(changed);
-      onApplied();
+      const info = await setFormValues(changed);
+      onApplied(info);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
