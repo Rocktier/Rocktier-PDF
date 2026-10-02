@@ -71,10 +71,9 @@ fn color_components(doc: &Document, dict: &lopdf::Dictionary) -> Option<u8> {
             let id = arr.get(1)?.as_reference().ok()?;
             let icc = doc.get_object(id).ok()?.as_stream().ok()?;
             match icc.dict.get(b"N").ok()? {
-                // 4 = CMYK。只有在 JPEG 路径下才接受（image 能解码 4 分量 JPEG 并转 RGB）；
-                // 原始 CMYK 位图的转换另有讲究，留给后续，现在先不接受。
                 Object::Integer(n) if *n == 1 || *n == 3 => Some(*n as u8),
-                Object::Integer(4) => Some(4),
+                // CMYK (N=4): 整张跳过重编码。转成 RGB 却不改写 /ColorSpace 会让
+                // 渲染器按 CMYK 解读 RGB 字节 → 图像损坏；保留原始 CMYK 数据最安全。
                 _ => None,
             }
         }

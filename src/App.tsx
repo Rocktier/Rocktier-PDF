@@ -514,6 +514,7 @@ export function App() {
     setSigPath(images[0]);
     setMarkupTool('sign');
     notify(t('sign.hint'));
+    notify(t('sign.disclaimer'));
   }, [notify, t]);
 
   const handlePageClick = useCallback(

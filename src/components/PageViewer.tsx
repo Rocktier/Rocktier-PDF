@@ -3,7 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import { useT } from '../i18n';
 import { getCached, getRender } from '../services/renderCache';
 import type { AnnotTool, MarkupRect, PageInfo, RenderedPage, SearchHit } from '../types';
-import { devicePixelRatioCapped, renderWidth } from '../utils';
+import { devicePixelRatioCapped, displayRectToPdf, pdfRectToDisplayFrac, renderWidth } from '../utils';
 import { useInView } from '../hooks/useInView';
 
 interface PageViewerProps {
@@ -190,22 +190,21 @@ function Page({
     if (markupTool === 'note' || markupTool === 'sign') {
       // Notes and signatures are placed with a click, not a drag.
       if (w > 6 || h > 6) return;
-      onNoteAt(
-        position,
-        (left / cssWidth) * page.width,
-        page.height - (top / cssHeight) * page.height
-      );
+      // Map the click from the rotated display box back to unrotated PDF coords.
+      const p = displayRectToPdf(left, top, 0, 0, cssWidth, cssHeight, page.rotation, page.width, page.height);
+      onNoteAt(position, p.x, p.y);
       return;
     }
 
     if (w < 4 || h < 4) return;
-    // DOM (top-left origin) → PDF points (bottom-left origin).
+    // Map the dragged rect from the rotated display box back to unrotated PDF coords.
+    const r = displayRectToPdf(left, top, w, h, cssWidth, cssHeight, page.rotation, page.width, page.height);
     onMarkup({
       page: position,
-      x: (left / cssWidth) * page.width,
-      y: page.height - ((top + h) / cssHeight) * page.height,
-      width: (w / cssWidth) * page.width,
-      height: (h / cssHeight) * page.height,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
     });
   };
 
@@ -230,18 +229,25 @@ function Page({
         </div>
       )}
 
-      {pageHits.map((hit) => (
-        <span
-          key={hit.index}
-          className={`hit${hit.index === activeHit ? ' active' : ''}`}
-          style={{
-            left: `${(hit.x / page.width) * 100}%`,
-            top: `${((page.height - hit.y - hit.height) / page.height) * 100}%`,
-            width: `${(hit.width / page.width) * 100}%`,
-            height: `${(hit.height / page.height) * 100}%`,
-          }}
-        />
-      ))}
+      {pageHits.map((hit) => {
+        // Search hits are in unrotated PDF coords; rotate them into the
+        // displayed (already-rotated) bitmap's box so the highlight lines up.
+        const f = pdfRectToDisplayFrac(
+          hit.x, hit.y, hit.width, hit.height, page.rotation, page.width, page.height,
+        );
+        return (
+          <span
+            key={hit.index}
+            className={`hit${hit.index === activeHit ? ' active' : ''}`}
+            style={{
+              left: `${f.left * 100}%`,
+              top: `${f.top * 100}%`,
+              width: `${f.width * 100}%`,
+              height: `${f.height * 100}%`,
+            }}
+          />
+        );
+      })}
 
       {markupTool ? (
         <div

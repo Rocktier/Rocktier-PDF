@@ -20,7 +20,7 @@ export const zh: Strings = {
     copyText: '复制文本',
     exportImages: '导出图片',
     imagesToPdf: '图片转 PDF',
-    sign: '签名',
+    sign: '印章',
     security: '密码保护',
     compress: '压缩',
     fillForm: '填写表单',
@@ -139,9 +139,10 @@ export const zh: Strings = {
   },
 
   sign: {
-    pick: '选择签名图片',
-    hint: '在页面上点击放置签名',
-    done: '已放置签名',
+    pick: '选择印章图片',
+    hint: '在页面上点击放置印章',
+    done: '已放置印章',
+    disclaimer: '仅为图片印章，不是密码学数字签名，不具备法律效力。',
   },
 
   note: {

@@ -18,7 +18,7 @@ export const en = {
     copyText: 'Copy text',
     exportImages: 'To images',
     imagesToPdf: 'Images to PDF',
-    sign: 'Sign',
+    sign: 'Stamp',
     security: 'Password protection',
     compress: 'Compress',
     fillForm: 'Fill form',
@@ -137,9 +137,10 @@ export const en = {
   },
 
   sign: {
-    pick: 'Choose a signature image',
-    hint: 'Click on the page to place your signature',
-    done: 'Signature placed',
+    pick: 'Choose a stamp image',
+    hint: 'Click on the page to place the stamp',
+    done: 'Stamp placed',
+    disclaimer: 'This is an image stamp only — not a cryptographic digital signature and carries no legal validity.',
   },
 
   note: {
