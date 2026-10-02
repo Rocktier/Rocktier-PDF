@@ -159,15 +159,29 @@ function runChecks(id, product, dir) {
     }
     // 键可能带引号（"a.b": '...'）也可能不带（appName: '...'）——两种都要认
     return new Set([
-      ...src.slice(startIdx, i).matchAll(/["'`]?([\w.$-]{2,})["'`]?\s*:\s*(?:["'`]|\[|\{|\(|true|false|-?\d)/g),
+      // 只收叶子键：值为 { 的是嵌套对象名，不是可对账文案键\n      ...src.slice(startIdx, i).matchAll(/["'`]?([\w.$-]{2,})["'`]?\s*:\s*(?:["'`]|\[|\(|true|false|-?\d)/g),
     ].map((x) => x[1]));
   };
+
+  // 形态 B：条目自带双语（Sign：Record<string, { en: string; zh: string }>）。
+  // 这类没有语言块，两种语言与键共置，天然不会漏译 —— 按条目收键即可。
+  for (const f of i18nFiles) {
+    const src = read(f);
+    if (/Record<[^>]*\{\s*en\s*:[\s\S]{0,120}?zh\s*:/.test(src)) {
+      const entries = [...src.matchAll(/(?:^|\n)\s{2,}["'`]?([\w.$-]+)["'`]?\s*:\s*\{\s*en\s*:/g)].map((m) => m[1]);
+      if (entries.length) {
+        for (const k of entries) { keysByLang.en.add(k); keysByLang.zh.add(k); }
+        break;
+      }
+    }
+  }
 
   for (const f of i18nFiles) {
     const src = read(f);
     // (a) 文件内语言块："en": { ... } / en = { ... } —— 大小写不敏感（Journal 写的是 var ZH = {...}）
     for (const lang of ["en", "zh"]) {
-      const re = new RegExp(`["']?${lang}["']?\\s*[:=]\\s*{`, "gi");
+      // 容忍区域码：Journal 的键是 "en-US" / "zh-CN"，不是裸 en / zh
+      const re = new RegExp(`["']?${lang}(?:[-_][A-Za-z]{2,4})?["']?\\s*[:=]\\s*{`, "gi");
       let m;
       while ((m = re.exec(src))) {
         for (const k of collectBlockKeys(src, m.index + m[0].length - 1)) keysByLang[lang].add(k);
@@ -184,7 +198,7 @@ function runChecks(id, product, dir) {
     const fname = basename(f).toLowerCase();
     for (const lang of ["en", "zh"]) {
       if (fname.startsWith(`${lang}.`) || fname.includes(`-${lang}.`) || fname.includes(`.${lang}.`)) {
-        for (const k of src.matchAll(/["'`]?([\w.$-]{2,})["'`]?\s*:\s*(?:["'`]|\[|\{|\()/g)) {
+        for (const k of src.matchAll(/["'`]?([\w.$-]{2,})["'`]?\s*:\s*(?:["'`]|\[|\()/g)) {
           keysByLang[lang].add(k[1]);
         }
       }
