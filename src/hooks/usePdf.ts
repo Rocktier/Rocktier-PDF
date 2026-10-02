@@ -266,5 +266,6 @@ export function usePdf() {
     stepHistory,
     refresh,
     clearError,
+    applyDoc,
   };
 }
