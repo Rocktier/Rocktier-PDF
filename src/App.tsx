@@ -44,10 +44,13 @@ import {
   } from './services/engine';
 import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
 
-type Theme = 'dark' | 'light';
+/** 三态：auto 跟随系统 → light → dark → auto（家族 §6.5 唯一状态机）。 */
+type Theme = 'auto' | 'light' | 'dark';
+type Resolved = 'light' | 'dark';
 type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | 'license' | null;
 
 const THEME_KEY = 'rocktier-pdf-editor.theme';
+const THEME_CYCLE: readonly Theme[] = ['auto', 'light', 'dark'];
 
 export function App() {
   const t = useT();
@@ -90,13 +93,28 @@ export function App() {
   >(null);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.theme = resolveTheme(theme);
     try {
       localStorage.setItem(THEME_KEY, theme);
     } catch {
       /* ignore */
     }
   }, [theme]);
+
+  // auto 态下系统外观变了要跟着变；light/dark 是用户明确选择，不动。
+  useEffect(() => {
+    if (theme !== 'auto') return;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onChange = () => {
+      document.documentElement.dataset.theme = systemTheme();
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [theme]);
+
+  const cycleTheme = useCallback(() => {
+    setTheme((prev) => THEME_CYCLE[(THEME_CYCLE.indexOf(prev) + 1) % THEME_CYCLE.length]);
+  }, []);
 
   const notify = useCallback((text: string, error = false) => {
     setToast({ text, error });
@@ -198,7 +216,7 @@ export function App() {
           setZoom(1);
           break;
         case 'toggle-theme':
-          setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+          cycleTheme();
           break;
         case 'license':
           setDialog('license');
@@ -710,7 +728,7 @@ export function App() {
         onRotate={rotateSelected}
         onDelete={removeSelected}
         onZoom={setZoom}
-        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+        onToggleTheme={cycleTheme}
       />
 
       {doc ? (
@@ -868,12 +886,23 @@ export function App() {
   );
 }
 
+/** 读存储。三态引入前这里只认 dark/light；老用户的值原样保留，不需要迁移。 */
 function readTheme(): Theme {
   try {
     const saved = localStorage.getItem(THEME_KEY);
-    if (saved === 'dark' || saved === 'light') return saved;
+    if (saved === 'dark' || saved === 'light' || saved === 'auto') return saved;
   } catch {
     /* ignore */
   }
-  return 'dark';
+  // 从没手动选过：跟随系统（家族基线，OCR / Pic2WebP / Journal 同规则）。
+  return 'auto';
+}
+
+function systemTheme(): Resolved {
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+/** auto 落成实际生效的 light/dark —— data-theme 只接受这两值。 */
+function resolveTheme(mode: Theme): Resolved {
+  return mode === 'auto' ? systemTheme() : mode;
 }

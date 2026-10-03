@@ -36,7 +36,7 @@ interface ToolbarProps {
   busy: boolean;
   selectedCount: number;
   zoom: number;
-  theme: 'dark' | 'light';
+  theme: 'auto' | 'light' | 'dark';
   markupTool: AnnotTool | null;
   onMarkupTool: (tool: AnnotTool | null) => void;
   redactActive: boolean;
@@ -276,8 +276,25 @@ export function Toolbar({
         {lang === 'en' ? 'EN' : '中'}
       </button>
 
-      <button className="btn btn-icon" onClick={onToggleTheme} title={t('toolbar.theme')}>
-        {theme === 'dark' ? <IconSun /> : <IconMoon />}
+      {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），三态靠 data-mode。
+          auto 态显示「屏幕」图标（跟系统走），否则显示将要去往的那一档。 */}
+      <button
+        className="icon-btn"
+        data-mode={theme}
+        onClick={onToggleTheme}
+        title={`${t('toolbar.theme')} · ${t(`theme.mode.${theme}`)}`}
+        aria-label={`${t('toolbar.theme')}: ${t(`theme.mode.${theme}`)}`}
+      >
+        {theme === 'auto' ? (
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2.5" y="4" width="19" height="13" rx="2" />
+            <path d="M8 20.5h8M12 17v3.5" />
+          </svg>
+        ) : theme === 'dark' ? (
+          <IconSun />
+        ) : (
+          <IconMoon />
+        )}
       </button>
     </div>
   );

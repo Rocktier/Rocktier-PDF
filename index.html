@@ -1,11 +1,31 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rocktier PDF Editor</title>
     <link rel="icon" type="image/png" sizes="256x256" href="/favicon.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <script>
+      // 主题必须在第一帧样式解析前定好：三态引入后默认值是 auto（跟随系统），
+      // 若等 React 挂载再设，浅色系统上会先画一帧黑底再跳变。
+      (function () {
+        try {
+          var saved = localStorage.getItem("rocktier-pdf-editor.theme");
+          var mode = saved === "light" || saved === "dark" || saved === "auto" ? saved : "auto";
+          var resolved =
+            mode === "auto"
+              ? window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark"
+              : mode;
+          document.documentElement.setAttribute("data-theme", resolved);
+          document.documentElement.setAttribute("data-theme-mode", mode);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

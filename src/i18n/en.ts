@@ -26,6 +26,15 @@ export const en = {
     redo: 'Redo',
   },
 
+  // 主题按钮三态文案（家族 §6.5）。title = 「Theme · Follow system」
+  theme: {
+    mode: {
+      auto: 'Follow system',
+      light: 'Light',
+      dark: 'Dark',
+    },
+  },
+
   empty: {
     title: 'Drop a PDF to begin',
     subtitle: 'Everything happens on your device. No uploads, no accounts, no internet.',

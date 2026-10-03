@@ -28,6 +28,15 @@ export const zh: Strings = {
     redo: '重做',
   },
 
+  // 主题按钮三态文案（家族 §6.5）
+  theme: {
+    mode: {
+      auto: '跟随系统',
+      light: '浅色',
+      dark: '深色',
+    },
+  },
+
   empty: {
     title: '拖入 PDF 开始',
     subtitle: '一切都在你的设备上完成。不上传、无账号、不联网。',
