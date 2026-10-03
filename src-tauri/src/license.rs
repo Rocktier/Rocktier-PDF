@@ -1,4 +1,4 @@
-//! 直链渠道的试用与授权 —— 准则 §12.3 的应用侧实现。
+﻿//! 直链渠道的试用与授权 —— 准则 §12.3 的应用侧实现。
 //!
 //! 分两半，互相独立：
 //!
@@ -78,11 +78,15 @@ const STATE_FILE: &str = "state.bin";
 /// 单品定价等于失效。准则 §12.3 的原话是 `accepted_products = [本应用, 家族]`，
 /// 这里照它执行。
 ///
-/// `SQ` = 本应用的在售单品码。名字沿用 PDF Squeeze 时期，**但它就是 PDF 自己的码**：
-/// 官网价格表 `rocktier.com/api/_shared.js` 里 PDF 单品的 price id 映射的就是 `SQ`，
-/// 已发出去的回执里也写着 `SQ`。删掉它会锁死所有已付费用户 —— 只能改注释，不能改这个码。
+/// `PD` = 本应用的单品码。2026-10-03 由 `SQ` 改名而来：旧码沿用 PDF Squeeze 时期，
+/// 而 Squeeze 已于 2026-09-18 因 Ghostscript AGPL 冲突下架，`SQ` 作为「已死产品码」
+/// 留在授权白名单里没有意义。改名依据：用户确认 MS Store 与官网直售**均无成交**，
+/// 因此不存在需要继续接受的存量 `SQ` 回执。
+///
+/// ⚠️ 官网价格表 `rocktier.com/api/_shared.js` 已同步改为 `PD`。**两处必须同批改**——
+/// 只改一处会导致新买家付款后拿到 `PD` 回执而应用只认 `SQ`（或反之），等于全员激活失败。
 /// `FL` = 全家桶。
-pub const ACCEPTED_PRODUCTS: [&str; 2] = ["SQ", "FL"];
+pub const ACCEPTED_PRODUCTS: [&str; 2] = ["PD", "FL"];
 
 /// 这份回执是否属于本应用可接受的授权。
 pub fn accepts(receipt: &Receipt) -> bool {
@@ -96,7 +100,7 @@ pub enum Status {
     Trialing { days_left: i64 },
     /// 试用已过期，且没有有效回执。
     Expired,
-    /// 已激活；`product` 来自回执（`SQ` 单品 / `FL` 全家桶等）。
+    /// 已激活；`product` 来自回执（`PD` 单品 / `FL` 全家桶等）。
     Licensed { product: String },
 }
 
@@ -124,7 +128,7 @@ impl Status {
 /// 服务端签发的回执内容。字段名与 `rocktier.com/api/activate` 的输出保持一致。
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Receipt {
-    /// 产品码：`SQ` / `WP` / `MD` / `CV` / `FL`。
+    /// 产品码：`PD` / `WP` / `MD` / `CV` / `FL`。
     pub product: String,
     /// 交易号（`txn_…` / `che_…`），用于人工核对。
     pub txn: String,
@@ -307,10 +311,10 @@ mod tests {
 
     #[test]
     fn a_valid_receipt_outranks_the_trial_state() {
-        let r = Receipt { product: "SQ".into(), txn: "txn_abc".into(), issued_at: T0 };
+        let r = Receipt { product: "PD".into(), txn: "txn_abc".into(), issued_at: T0 };
         assert_eq!(
             status_from(Some(T0), Some(&r), T0 + 99 * DAY),
-            Status::Licensed { product: "SQ".into() }
+            Status::Licensed { product: "PD".into() }
         );
     }
 
@@ -318,7 +322,7 @@ mod tests {
     fn write_is_blocked_only_when_enforcing_and_expired() {
         let expired = Status::Expired;
         let trialing = Status::Trialing { days_left: 3 };
-        let licensed = Status::Licensed { product: "SQ".into() };
+        let licensed = Status::Licensed { product: "PD".into() };
 
         assert!(expired.allows_write(false), "未启用拦截时一律放行（当前线上状态）");
         assert!(!expired.allows_write(true), "启用拦截后过期用户不得写文件");
@@ -463,7 +467,7 @@ mod tests {
             txn: "txn_x".into(),
             issued_at: T0,
         };
-        assert!(accepts(&make("SQ")), "本单品的码必须接受");
+        assert!(accepts(&make("PD")), "本单品的码必须接受");
         assert!(accepts(&make("FL")), "全家桶的码必须接受");
         for other in ["WP", "MD", "CV"] {
             assert!(
@@ -472,7 +476,7 @@ mod tests {
             );
         }
         assert!(!accepts(&make("")), "空产品码不得接受");
-        assert!(!accepts(&make("sq")), "产品码区分大小写（大小写不符即为非本应用）");
+        assert!(!accepts(&make("pd")), "产品码区分大小写（大小写不符即为非本应用）");
     }
 
     #[test]
@@ -486,7 +490,7 @@ mod tests {
         let key = SigningKey::from_bytes(&[3u8; 32]);
         let pub_b64 = base64::engine::general_purpose::STANDARD
             .encode(key.verifying_key().to_bytes());
-        let receipt = Receipt { product: "SQ".into(), txn: "txn_1".into(), issued_at: T0 };
+        let receipt = Receipt { product: "PD".into(), txn: "txn_1".into(), issued_at: T0 };
         let payload = serde_json::to_vec(&receipt).unwrap();
         let engine = base64::engine::general_purpose::STANDARD;
         let signed = format!("{}.{}", engine.encode(&payload), engine.encode(key.sign(&payload).to_bytes()));
