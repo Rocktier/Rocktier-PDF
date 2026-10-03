@@ -22,6 +22,25 @@
     ],
     "macOS": {
       "entitlements": "Entitlements.plist"
+    },
+    "windows": {
+      "allowDowngrades": true,
+      "digestAlgorithm": "sha256",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "English"
+        ],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "349046AE-FB14-5C8D-A408-FF3B0B047315"
+      }
     }
   },
   "productName": "Rocktier PDF",
