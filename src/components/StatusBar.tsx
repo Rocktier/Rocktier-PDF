@@ -1,5 +1,6 @@
 import { useT } from '../i18n';
 import { formatBytes, type LicenseInfo } from '../services/engine';
+import { localizeError } from '../services/errorText';
 import type { DocumentInfo } from '../types';
 
 interface StatusBarProps {
@@ -21,7 +22,13 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
     !!license && license.channel === 'direct' && license.status !== 'licensed';
 
   const state = error ? 'error' : busy ? 'busy' : 'ready';
-  const label = error ?? (busy ? t('status.working') : t('status.ready'));
+  // Rust 把错误拍平为英文原文返回；这里做一层映射，转成当前语言的措辞。
+  // 查不到映射时回退原文 —— 规范要求失败时展示底层真实错误文本，不隐藏细节。
+  const label = error
+    ? localizeError(error, t)
+    : busy
+      ? t('status.working')
+      : t('status.ready');
 
   return (
     <div className="statusbar" role="status" aria-live="polite">

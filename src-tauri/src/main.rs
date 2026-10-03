@@ -11,7 +11,7 @@ mod pdf;
 mod security;
 mod state;
 
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter};
 
 use state::AppState;
@@ -42,7 +42,19 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         "Rocktier PDF Editor",
         true,
         &[
-            &PredefinedMenuItem::about(app, Some(l("关于 Rocktier PDF Editor", "About Rocktier PDF Editor")), None)?,
+            // 第三个参数不能是 None：Windows 后端只有匹配
+            // `PredefinedMenuItemType::About(Some(metadata))` 才会调show_about_dialog，
+            // None 落入 `_ => {}` —— 菜单项在，点击**完全无反应**。
+            // macOS 走 NSAboutPanel（忽略 metadata），所以这个坑只在 Windows 暴露。
+            &PredefinedMenuItem::about(
+                app,
+                Some(l("关于 Rocktier PDF Editor", "About Rocktier PDF Editor")),
+                Some(AboutMetadata {
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                    copyright: Some("Copyright 2026 Rocktier".to_string()),
+                    ..Default::default()
+                }),
+            )?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
