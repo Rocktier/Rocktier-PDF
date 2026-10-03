@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { useT } from '../i18n';
 import { getCached, getRender } from '../services/renderCache';
-import type { AnnotTool, MarkupRect, PageInfo, RenderedPage, SearchHit } from '../types';
+import type { AnnotTool, MarkupRect, PageInfo, RedactRect, RenderedPage, SearchHit } from '../types';
 import { devicePixelRatioCapped, displayRectToPdf, pdfRectToDisplayFrac, renderWidth } from '../utils';
 import { useInView } from '../hooks/useInView';
 
@@ -16,6 +16,11 @@ interface PageViewerProps {
   activeHit: number;
   markupTool: AnnotTool | null;
   onMarkup: (rect: MarkupRect) => void;
+  /** Redact mode armed: drags accumulate redaction rectangles instead of markup. */
+  redactMode: boolean;
+  /** Rectangles marked for redaction so far, shown as dashed overlays. */
+  redactRects: RedactRect[];
+  onRedactRect: (rect: RedactRect) => void;
   onNoteAt: (page: number, x: number, y: number) => void;
   onSelect: (index: number) => void;
   onVisible: (index: number) => void;
@@ -32,6 +37,9 @@ export function PageViewer({
   activeHit,
   markupTool,
   onMarkup,
+  redactMode,
+  redactRects,
+  onRedactRect,
   onNoteAt,
   onSelect,
   onVisible,
@@ -74,6 +82,9 @@ export function PageViewer({
             activeHit={activeHit}
             markupTool={markupTool}
             onMarkup={onMarkup}
+            redactMode={redactMode}
+            redactRects={redactRects}
+            onRedactRect={onRedactRect}
             onNoteAt={onNoteAt}
             onSelect={onSelect}
             onVisible={onVisible}
@@ -95,6 +106,9 @@ interface PageProps {
   activeHit: number;
   markupTool: AnnotTool | null;
   onMarkup: (rect: MarkupRect) => void;
+  redactMode: boolean;
+  redactRects: RedactRect[];
+  onRedactRect: (rect: RedactRect) => void;
   onNoteAt: (page: number, x: number, y: number) => void;
   onSelect: (index: number) => void;
   onVisible: (index: number) => void;
@@ -111,6 +125,9 @@ function Page({
   activeHit,
   markupTool,
   onMarkup,
+  redactMode,
+  redactRects,
+  onRedactRect,
   onNoteAt,
   onSelect,
   onVisible,
@@ -172,6 +189,12 @@ function Page({
     .map((hit, index) => ({ ...hit, index }))
     .filter((hit) => hit.page === position);
 
+  // Redaction rectangles drawn on this page so far, carrying their global
+  // index so the append-only list gets stable React keys.
+  const pageRedactRects = redactRects
+    .map((rect, index) => ({ rect, index }))
+    .filter(({ rect }) => rect.page === position);
+
   const localPoint = (e: ReactMouseEvent) => {
     const el = layerRef.current;
     if (!el) return { x: 0, y: 0 };
@@ -199,6 +222,17 @@ function Page({
     if (w < 4 || h < 4) return;
     // Map the dragged rect from the rotated display box back to unrotated PDF coords.
     const r = displayRectToPdf(left, top, w, h, cssWidth, cssHeight, page.rotation, page.width, page.height);
+    if (redactMode) {
+      // Redaction accumulates rectangles; they apply together on confirm.
+      onRedactRect({
+        page: position,
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      });
+      return;
+    }
     onMarkup({
       page: position,
       x: r.x,
@@ -249,7 +283,26 @@ function Page({
         );
       })}
 
-      {markupTool ? (
+      {/* Rectangles marked for redaction, in PDF coords like search hits. */}
+      {pageRedactRects.map(({ rect, index }) => {
+        const f = pdfRectToDisplayFrac(
+          rect.x, rect.y, rect.width, rect.height, page.rotation, page.width, page.height,
+        );
+        return (
+          <span
+            key={`redact:${index}`}
+            className="redact-box"
+            style={{
+              left: `${f.left * 100}%`,
+              top: `${f.top * 100}%`,
+              width: `${f.width * 100}%`,
+              height: `${f.height * 100}%`,
+            }}
+          />
+        );
+      })}
+
+      {markupTool || redactMode ? (
         <div
           ref={layerRef}
           className="annot-layer"
@@ -268,7 +321,7 @@ function Page({
         >
           {drag ? (
             <div
-              className={`annot-preview ${markupTool}`}
+              className={`annot-preview ${redactMode ? 'redact' : markupTool}`}
               style={{
                 left: Math.min(drag.x0, drag.x1),
                 top: Math.min(drag.y0, drag.y1),

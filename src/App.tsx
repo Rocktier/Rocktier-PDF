@@ -8,6 +8,8 @@ import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
 import { PasswordDialog } from './components/PasswordDialog';
 import { Modal } from './components/Modal';
+import { RedactBar } from './components/RedactBar';
+import { RedactDialog } from './components/RedactDialog';
 import { SecurityDialog } from './components/SecurityDialog';
 import { CompressDialog } from './components/CompressDialog';
 import { LicenseDialog } from './components/LicenseDialog';
@@ -40,7 +42,7 @@ import {
   onLicenseExpired,
   type LicenseInfo,
   } from './services/engine';
-import type { AnnotTool, MarkupRect, SearchHit, StampKind } from './types';
+import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
 
 type Theme = 'dark' | 'light';
 type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | 'license' | null;
@@ -74,6 +76,11 @@ export function App() {
   const [activeHit, setActiveHit] = useState(0);
   const searchToken = useRef(0);
   const [markupTool, setMarkupTool] = useState<AnnotTool | null>(null);
+  // 脱敏是独立于 markupTool 的选区模式（同一互斥组），但拖出来的矩形先
+  // 累积在画布上，等用户在确认弹层里点头才真正应用——永久删除必须有一道闸。
+  const [redactMode, setRedactMode] = useState(false);
+  const [redactRects, setRedactRects] = useState<RedactRect[]>([]);
+  const [redactConfirm, setRedactConfirm] = useState(false);
   const [noteAt, setNoteAt] = useState<{ page: number; x: number; y: number } | null>(null);
   const [sigPath, setSigPath] = useState<string | null>(null);
   const [pwPrompt, setPwPrompt] = useState<{ path: string; incorrect: boolean } | null>(null);
@@ -107,6 +114,9 @@ export function App() {
         setFindQuery('');
         setHits([]);
         setActiveHit(0);
+        // 换文档后旧选区指向的是别的页面，必须清干净。
+        setRedactRects([]);
+        setRedactMode(false);
         notify(t('toast.opened', { name: info.name }));
       } else if (error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT') {
         setPwPrompt({ path, incorrect: error === 'PASSWORD_INCORRECT' });
@@ -268,12 +278,18 @@ export function App() {
         if (editing) return;
         e.preventDefault();
         void removeSelected();
+      } else if (e.key === 'Escape' && redactMode) {
+        // Esc 只退出选区模式（规格如此），已画的矩形与浮出条原地保留，
+        // 应用/取消交给浮出条——按 Esc 绝不能悄悄丢掉用户的选区。
+        if (redactConfirm) return; // 确认弹层开着时，Esc 归弹层。
+        e.preventDefault();
+        setRedactMode(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf.selected, pdf.doc, pdf.stepHistory, guard]);
+  }, [pdf.selected, pdf.doc, pdf.stepHistory, guard, redactMode, redactConfirm]);
 
   /* ── Find ───────────────────────────────────────────────────── */
   useEffect(() => {
@@ -389,6 +405,8 @@ export function App() {
         setPwPrompt(null);
         setCurrent(0);
         setZoom(1);
+        setRedactRects([]);
+        setRedactMode(false);
         notify(t('toast.opened', { name: info.name }));
         return true;
       }
@@ -505,6 +523,60 @@ export function App() {
     [markupTool, notify, pdf, t]
   );
 
+  /* ── Redaction ───────────────────────────────────────────────── */
+
+  /** Markup 与 Redact 同一互斥组：拿起一头，先放下另一头。 */
+  const chooseMarkupTool = useCallback((tool: AnnotTool | null) => {
+    setRedactMode(false);
+    setMarkupTool(tool);
+  }, []);
+
+  const toggleRedact = useCallback(() => {
+    setMarkupTool(null);
+    if (!redactMode) notify(t('redact.hint'));
+    setRedactMode((prev) => !prev);
+  }, [notify, redactMode, t]);
+
+  const addRedactRect = useCallback((rect: RedactRect) => {
+    setRedactRects((prev) => [...prev, rect]);
+  }, []);
+
+  /** 取消 = 丢掉全部待应用矩形并退出选区模式。 */
+  const cancelRedact = useCallback(() => {
+    setRedactRects([]);
+    setRedactMode(false);
+  }, []);
+
+  const confirmRedact = useCallback(async () => {
+    if (redactRects.length === 0) return;
+    const regions = redactRects.map((r) => ({
+      pageIndex: r.page,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
+    }));
+    // 失败时把错误抛回给 RedactDialog 显示；矩形原地保留，用户可以重试。
+    const { outcome, error } = await pdf.redact(regions);
+    if (error) throw new Error(error);
+    if (!outcome) return;
+    setRedactRects([]);
+    setRedactMode(false);
+
+    const parts = [t('redact.done', { count: outcome.removed })];
+    if (outcome.crossed > 0) {
+      parts.push(t('redact.crossed', { count: outcome.crossed }));
+    }
+    notify(parts.join(' '), false);
+    // 校验告警（区域里疑似还有字）延迟一拍，否则会被前一条 toast 覆盖。
+    if (outcome.residualRegions > 0) {
+      window.setTimeout(
+        () => notify(t('redact.residual', { count: outcome.residualRegions }), true),
+        2700
+      );
+    }
+  }, [notify, pdf, redactRects, t]);
+
   const applyNote = useCallback(
     async (text: string) => {
       if (!noteAt) return;
@@ -616,7 +688,9 @@ export function App() {
         zoom={zoom}
         theme={theme}
         markupTool={markupTool}
-        onMarkupTool={setMarkupTool}
+        onMarkupTool={chooseMarkupTool}
+        redactActive={redactMode}
+        onRedactTool={toggleRedact}
         onOpen={openFile}
         onSave={save}
         onSaveAs={saveAs}
@@ -660,11 +734,21 @@ export function App() {
               activeHit={activeHit}
               markupTool={markupTool}
               onMarkup={(rect) => void applyMarkup(rect)}
+              redactMode={redactMode}
+              redactRects={redactRects}
+              onRedactRect={addRedactRect}
               onNoteAt={handlePageClick}
               onSelect={toggleSelected}
               onVisible={setCurrent}
               onStep={stepPage}
             />
+            {redactRects.length > 0 ? (
+              <RedactBar
+                count={redactRects.length}
+                onApply={() => setRedactConfirm(true)}
+                onCancel={cancelRedact}
+              />
+            ) : null}
             {findOpen ? (
               <FindBar
                 query={findQuery}
@@ -734,6 +818,13 @@ export function App() {
         />
       ) : null}
       {noteAt ? <NoteDialog onClose={() => setNoteAt(null)} onRun={applyNote} /> : null}
+      {redactConfirm ? (
+        <RedactDialog
+          count={redactRects.length}
+          onClose={() => setRedactConfirm(false)}
+          onConfirm={confirmRedact}
+        />
+      ) : null}
       {pwPrompt ? (
         <PasswordDialog
           incorrect={pwPrompt.incorrect}

@@ -13,12 +13,21 @@ import {
   addMarkup,
   addNote,
   addSignature,
+  redactRegions,
   redo as redoDocument,
   undo as undoDocument,
 } from '../services/engine';
 import { clearRenderCache } from '../services/renderCache';
 import { fileStem } from '../services/engine';
-import type { DocumentInfo, MarkupKind, MarkupRect, SplitMode, StampKind } from '../types';
+import type {
+  DocumentInfo,
+  MarkupKind,
+  MarkupRect,
+  RedactOutcome,
+  RedactRegion,
+  SplitMode,
+  StampKind,
+} from '../types';
 
 /**
  * Owns the single open document and every mutation that touches it.
@@ -237,6 +246,20 @@ export function usePdf() {
   );
 
   /**
+   * Applies the redaction and reports the outcome (counts + warnings travel
+   * with the result so the caller can surface them via i18n). Like every
+   * mutation, the returned document is adopted and the render cache cleared.
+   */
+  const redact = useCallback(
+    async (regions: RedactRegion[]): Promise<{ outcome: RedactOutcome | null; error: string | null }> => {
+      const { value: outcome, error } = await run(() => redactRegions(regions));
+      if (outcome) applyDoc(outcome.info);
+      return { outcome, error };
+    },
+    [applyDoc, run]
+  );
+
+  /**
    * Steps the document history. An empty history is not an error worth
    * surfacing, so it simply reports `false`.
    */
@@ -287,6 +310,7 @@ export function usePdf() {
     markup,
     note,
     signature,
+    redact,
     stepHistory,
     refresh,
     clearError,

@@ -231,6 +231,7 @@ fn main() {
             commands::add_markup,
             commands::add_note,
             commands::add_signature,
+            commands::redact_regions,
             commands::remove_password,
             commands::set_password,
             commands::list_form_fields,

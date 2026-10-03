@@ -471,6 +471,130 @@ pub fn add_markup(
     Ok(())
 }
 
+/* ── Redaction ───────────────────────────────────────────────────── */
+
+/// 一个待脱敏矩形，PDF 点坐标（原点左下，未旋转空间）。
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct RedactRegion {
+    pub page_index: i32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// 一次脱敏的统计结果。
+///
+/// 告警用结构化字段返回而不是英文串：错误走状态栏原样显示没问题，
+/// 但「有对象被整块多删」「疑似有字没删干净」是给用户看的正常输出，
+/// 必须经前端的 i18n 渲染（en/zh 各自成句）。
+#[derive(Debug, Default, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedactSummary {
+    /// 删除的文本对象数。
+    pub removed: usize,
+    /// 跨出区域边界、被整对象删除的文本对象数（宁多勿漏，如实上报）。
+    pub crossed: usize,
+    /// 应用后重扫仍在区域内发现文本对象的区域数（校验告警，不阻塞）。
+    pub residual_regions: usize,
+}
+
+/// 真脱敏：**删除**与区域相交的文本对象（含其字符内容），再在区域画不透明黑色矩形。
+///
+/// 与高亮/黑矩形盖住的区别在底层：文本对象从页面内容流里移除，保存后任何
+/// 阅读器在该区域都选不中、复制不出原文字。这是**写后即不可逆**的操作
+/// （撤销栈只回滚本次应用内的字节快照），确认文案必须写明。
+///
+/// 「宁多勿漏」：文本对象只要与区域相交就整对象删除——一个跨行/跨区域的
+/// 文本对象被切一半会留下另一半原文，比多删几行危险得多。跨出边界的对象
+/// 计入 `crossed` 如实上报。
+///
+/// v1 已知边界（有意不做）：只处理页面顶层内容流的文本对象——
+/// 图片内文字（扫描件）、Form XObject 里嵌套的文本、批注（/Annots）都不在
+/// 删除范围。前两类靠 `residual_regions` 校验告警兜底提示。
+pub fn redact_regions(
+    doc: &mut PdfDocument,
+    regions: &[RedactRegion],
+) -> Result<RedactSummary, String> {
+    if regions.is_empty() {
+        return Err("No redaction regions were drawn".to_string());
+    }
+
+    let total = doc.pages().len();
+    for region in regions {
+        if region.page_index < 0 || region.page_index >= total {
+            return Err(format!("Page {} is out of range", region.page_index + 1));
+        }
+        if region.width <= 0.5 || region.height <= 0.5 {
+            return Err("Redaction region is too small".to_string());
+        }
+    }
+
+    let mut summary = RedactSummary::default();
+
+    for region in regions {
+        let area = PdfRect::new_from_values(
+            region.y,
+            region.x,
+            region.y + region.height,
+            region.x + region.width,
+        );
+
+        let mut page = doc
+            .pages_mut()
+            .get(region.page_index)
+            .map_err(|e| e.to_string())?;
+        let objects = page.objects_mut();
+
+        // 倒序删除：正序删一个后面的索引整体前移，会漏掉或删错对象。
+        for index in (0..objects.len()).rev() {
+            // hit: Some(是否完全在区域内)。先取信息再丢弃对象包装，
+            // 让不可变借用结束在 remove 之前。
+            let hit = objects.get(index).ok().and_then(|object| {
+                if object.object_type() != PdfPageObjectType::Text {
+                    return None;
+                }
+                let rect = object.bounds().ok()?.to_rect();
+                if !rect.does_overlap(&area) {
+                    return None;
+                }
+                Some(rect.is_inside(&area))
+            });
+            let Some(entirely_inside) = hit else {
+                continue;
+            };
+            if !entirely_inside {
+                summary.crossed += 1;
+            }
+            if objects.remove_object_at_index(index).is_ok() {
+                summary.removed += 1;
+            }
+        }
+
+        // 不透明黑色矩形盖住区域。后加的对象画在最上层。
+        objects
+            .create_path_object_rect(area, None, None, Some(PdfColor::new(0, 0, 0, 255)))
+            .map_err(|e| e.to_string())?;
+
+        // 校验：重扫该区域，若仍有文本对象（例如 Form XObject 里嵌套的
+        // 文本不在顶层内容流，上一轮删不到），计一条告警但继续。
+        let residual = (0..objects.len()).any(|index| {
+            objects
+                .get(index)
+                .ok()
+                .filter(|object| object.object_type() == PdfPageObjectType::Text)
+                .and_then(|object| object.bounds().ok())
+                .is_some_and(|bounds| bounds.to_rect().does_overlap(&area))
+        });
+        if residual {
+            summary.residual_regions += 1;
+        }
+    }
+
+    Ok(summary)
+}
+
 /// Adds a sticky-note (Text) annotation anchored at the given point.
 pub fn add_note(
     doc: &mut PdfDocument,
@@ -916,5 +1040,273 @@ mod tests {
         assert_eq!(rotation_of(360), PdfPageRenderRotation::None);
         assert_eq!(rotation_of(450), PdfPageRenderRotation::Degrees90);
         assert_eq!(rotation_of(-90), PdfPageRenderRotation::Degrees270);
+    }
+
+    /* ── Redaction ───────────────────────────────────────────────── */
+
+    /// 用 lopdf 在内存构造一份含已知文本的最小 PDF：
+    /// 24pt 的 "SECRET-4242 confidential"（基线 y=700，x 从 72 起）和
+    /// 14pt 的 "public line"（基线 y=600）。验收要求的核心夹具——
+    /// 构造、脱敏、验证全链路都不依赖磁盘上的任何现成文件。
+    fn build_text_pdf() -> Vec<u8> {
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+
+        let content =
+            b"BT /F1 24 Tf 72 700 Td (SECRET-4242 confidential) Tj ET\nBT /F1 14 Tf 72 600 Td (public line) Tj ET";
+        let content_id = doc.add_object(Stream::new(
+            dictionary! { "Length" => content.len() as i64 },
+            content.to_vec(),
+        ));
+
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Helvetica",
+        });
+
+        let pages_id = doc.add_object(dictionary! {
+            "Type" => "Pages",
+            "Count" => 1i64,
+            "Kids" => Vec::<Object>::new(),
+        });
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => Object::Reference(pages_id),
+            "MediaBox" => vec![0i64.into(), 0i64.into(), 612i64.into(), 792i64.into()],
+            "Contents" => Object::Reference(content_id),
+            "Resources" => dictionary! {
+                "Font" => dictionary! { "F1" => Object::Reference(font_id) },
+            },
+        });
+
+        let pages = doc.objects.get_mut(&pages_id).expect("pages object");
+        pages
+            .as_dict_mut()
+            .expect("pages dict")
+            .set("Kids", vec![Object::Reference(page_id)]);
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => Object::Reference(pages_id),
+        });
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+
+        let mut bytes: Vec<u8> = Vec::new();
+        doc.save_to(&mut bytes).expect("serialize");
+        bytes
+    }
+
+    fn text_pdf_doc() -> PdfDocument<'static> {
+        test_pdfium()
+            .load_pdf_from_byte_vec(build_text_pdf(), None)
+            .expect("lopdf-built PDF must load into pdfium")
+    }
+
+    /// 页面上的文本对象是否仍包含 `needle`（绕开 search 的分词，直接逐对象读）。
+    fn page_still_contains(doc: &PdfDocument, index: i32, needle: &str) -> bool {
+        let page = doc.pages().get(index).expect("page");
+        let count = page.objects().len();
+        (0..count).any(|i| {
+            page.objects()
+                .get(i)
+                .ok()
+                .and_then(|object| object.as_text_object().map(|t| t.text()))
+                .is_some_and(|text| text.contains(needle))
+        })
+    }
+
+    /// 区域内是否存在一个黑色不透明填充的路径对象（即脱敏盖板）。
+    fn has_black_cover(doc: &PdfDocument, index: i32, region: RedactRegion) -> bool {
+        let page = doc.pages().get(index).expect("page");
+        let area = PdfRect::new_from_values(
+            region.y,
+            region.x,
+            region.y + region.height,
+            region.x + region.width,
+        );
+        let count = page.objects().len();
+        (0..count).any(|i| {
+            page.objects()
+                .get(i)
+                .ok()
+                .filter(|object| object.object_type() == PdfPageObjectType::Path)
+                .and_then(|object| {
+                    let fill = object.fill_color().ok()?;
+                    let inside = object.bounds().ok()?.to_rect().is_inside(&area);
+                    Some(
+                        inside
+                            && fill.red() == 0
+                            && fill.green() == 0
+                            && fill.blue() == 0
+                            && fill.alpha() == 255,
+                    )
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    /// 核心验收：区域内文字被真删（page_text / search / 逐对象三路确认），
+    /// 黑色盖板存在，且统计数正确。
+    #[test]
+    fn redact_deletes_text_and_draws_opaque_cover() {
+        let mut doc = text_pdf_doc();
+        assert!(page_text(&doc, 0).unwrap().contains("public line"));
+
+        // "public line" 的对象框完全落在这个区域里。
+        let region = RedactRegion {
+            page_index: 0,
+            x: 60.0,
+            y: 585.0,
+            width: 220.0,
+            height: 40.0,
+        };
+        let summary = redact_regions(&mut doc, &[region]).expect("redact");
+
+        assert_eq!(summary.removed, 1, "应恰好删掉 1 个文本对象");
+        assert_eq!(summary.crossed, 0, "对象完全在区域内，不应报跨界");
+        assert_eq!(summary.residual_regions, 0, "区域内不应残留文本对象");
+
+        // 三路验证文字真的没了：页面全文、搜索引擎、逐对象。
+        assert!(!page_text(&doc, 0).unwrap().contains("public line"));
+        assert!(search_document(&doc, "public", false, false)
+            .unwrap()
+            .is_empty());
+        assert!(!page_still_contains(&doc, 0, "public"));
+
+        // 区域外的文字不受影响。
+        assert!(page_text(&doc, 0).unwrap().contains("SECRET-4242"));
+
+        // 黑色不透明盖板存在。
+        assert!(has_black_cover(&doc, 0, region), "区域内应有黑色盖板");
+    }
+
+    /// 宁多勿漏：文本对象与区域相交但跨出边界 → 整对象删除并如实上报。
+    #[test]
+    fn redact_removes_whole_object_when_it_crosses_the_region() {
+        let mut doc = text_pdf_doc();
+
+        // 只罩住 "SECRET-4242 confidential" 的左半段；对象框远超区域。
+        let region = RedactRegion {
+            page_index: 0,
+            x: 60.0,
+            y: 690.0,
+            width: 100.0,
+            height: 40.0,
+        };
+        let summary = redact_regions(&mut doc, &[region]).expect("redact");
+
+        assert_eq!(summary.removed, 1);
+        assert_eq!(summary.crossed, 1, "跨界对象必须被计数上报");
+        assert_eq!(summary.residual_regions, 0);
+
+        // 整对象删除：区域里没有字了，区域外那半段也不在了——宁可多删。
+        assert!(!page_text(&doc, 0).unwrap().contains("SECRET-4242"));
+        assert!(!page_text(&doc, 0).unwrap().contains("confidential"));
+        assert!(search_document(&doc, "confidential", false, false)
+            .unwrap()
+            .is_empty());
+        assert!(page_text(&doc, 0).unwrap().contains("public line"));
+    }
+
+    /// 多区域、多页：一次调用处理多个区域，只动各自页面。
+    #[test]
+    fn redact_handles_multiple_regions() {
+        let mut doc = text_pdf_doc();
+        doc.pages_mut()
+            .create_page_at_end(PdfPagePaperSize::a4())
+            .expect("second page");
+
+        let regions = vec![
+            RedactRegion {
+                page_index: 0,
+                x: 60.0,
+                y: 690.0,
+                width: 100.0,
+                height: 40.0,
+            },
+            RedactRegion {
+                page_index: 0,
+                x: 60.0,
+                y: 585.0,
+                width: 220.0,
+                height: 40.0,
+            },
+            RedactRegion {
+                page_index: 1,
+                x: 60.0,
+                y: 585.0,
+                width: 220.0,
+                height: 40.0,
+            },
+        ];
+        let summary = redact_regions(&mut doc, &regions).expect("redact");
+        assert_eq!(summary.removed, 2, "第 2 页没有文本对象可删");
+
+        let text = page_text(&doc, 0).unwrap();
+        assert!(!text.contains("SECRET"));
+        assert!(!text.contains("public"));
+    }
+
+    /// 垃圾输入必须报错：页码越界、区域过小、空区域列表。
+    #[test]
+    fn redact_rejects_bad_regions() {
+        let mut doc = text_pdf_doc();
+
+        let out_of_range = RedactRegion {
+            page_index: 5,
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        assert!(redact_regions(&mut doc, &[out_of_range]).is_err());
+
+        let too_small = RedactRegion {
+            page_index: 0,
+            x: 10.0,
+            y: 10.0,
+            width: 0.2,
+            height: 30.0,
+        };
+        assert!(redact_regions(&mut doc, &[too_small]).is_err());
+
+        assert!(redact_regions(&mut doc, &[]).is_err());
+
+        // 报错的调用不能动文档。
+        assert!(page_text(&doc, 0).unwrap().contains("SECRET-4242"));
+    }
+
+    /// 脱敏产物写出后重读：文字层在文件里就是没了，不是只在内存里。
+    #[test]
+    fn redacted_file_has_no_text_after_roundtrip() {
+        let mut doc = text_pdf_doc();
+        let region = RedactRegion {
+            page_index: 0,
+            x: 60.0,
+            y: 690.0,
+            width: 400.0,
+            height: 40.0,
+        };
+        redact_regions(&mut doc, &[region]).expect("redact");
+
+        let dir = std::env::temp_dir().join("rocktier-pdf-editor-tests");
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("redacted.pdf");
+        doc.save_to_file(&path).expect("save");
+
+        let pdfium = test_pdfium();
+        let reloaded = pdfium
+            .load_pdf_from_byte_vec(std::fs::read(&path).expect("read"), None)
+            .expect("reload");
+        assert!(!page_text(&reloaded, 0).unwrap().contains("SECRET"));
+        assert!(page_text(&reloaded, 0).unwrap().contains("public line"));
+        assert!(search_document(&reloaded, "SECRET", false, false)
+            .unwrap()
+            .is_empty());
+
+        let _ = std::fs::remove_file(&path);
     }
 }

@@ -7,6 +7,8 @@ import type {
   MarkupKind,
   MarkupRect,
   PathResult,
+  RedactOutcome,
+  RedactRegion,
   RenderedPage,
   SearchHit,
   SplitMode,
@@ -294,6 +296,14 @@ export async function addSignature(
   imagePath: string
 ): Promise<DocumentInfo> {
   return invoke<DocumentInfo>('add_signature', { page, x, y, width, imagePath });
+}
+
+/**
+ * Permanently deletes the text objects intersecting the given regions and
+ * paints an opaque black rectangle over each one. Irreversible once saved.
+ */
+export async function redactRegions(regions: RedactRegion[]): Promise<RedactOutcome> {
+  return invoke<RedactOutcome>('redact_regions', { regions });
 }
 
 /** Export the given pages as PNG files into `outputDir`. */

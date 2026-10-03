@@ -104,6 +104,24 @@ export const zh: Strings = {
     done: '已添加标注',
   },
 
+  redact: {
+    toolbar: '脱敏',
+    hint: '在要移除的文字上拖拽矩形，然后应用脱敏',
+    barCount: '已标出 {count} 个区域',
+    apply: '应用脱敏',
+    cancel: '取消',
+    confirmTitle: '应用脱敏？',
+    confirmBody:
+      '即将脱敏 {count} 个区域。区域下的文字将从文档中永久删除——不是盖住，是删除。',
+    confirmWarningTitle: '此操作不可恢复',
+    confirmWarning:
+      '底层文字将被永久移除。保存之后，任何 PDF 阅读器都无法选中、复制或找回这些文字——本应用也不能。撤销只在保存之前有效。',
+    confirmRun: '永久删除文字',
+    done: '已删除 {count} 个文本对象',
+    crossed: '{count} 个对象跨出区域边界，已被整块删除。',
+    residual: '警告：{count} 个区域内疑似仍有文字，分享前请自行核验。',
+  },
+
   form: {
     title: '填写表单',
     empty: '该 PDF 没有可填写的表单字段。',

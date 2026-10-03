@@ -68,6 +68,36 @@ export type MarkupKind = 'highlight' | 'underline' | 'strikeout';
 /** Any annotation tool the user can arm: rect marks, notes, and signatures. */
 export type AnnotTool = MarkupKind | 'note' | 'sign';
 
+/** A rectangle the user marked for redaction, in PDF points (origin bottom-left). */
+export interface RedactRect {
+  /** Zero-based page index. */
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Mirrors `pdf::RedactRegion` — the wire shape `redact_regions` expects. */
+export interface RedactRegion {
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Mirrors `commands::RedactOutcome`. Warnings are counts, rendered via i18n. */
+export interface RedactOutcome {
+  /** Text objects removed. */
+  removed: number;
+  /** Text objects that extended beyond a region and were removed entirely. */
+  crossed: number;
+  /** Regions where a rescan still found text after the pass. */
+  residualRegions: number;
+  info: DocumentInfo;
+}
+
 export interface MarkupRect {
   /** Zero-based page index. */
   page: number;

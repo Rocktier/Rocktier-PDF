@@ -173,6 +173,15 @@ export const IconStamp = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+/** Redaction: an opaque black bar over a text line. */
+export const IconRedact = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M4 3h8" opacity="0.55" />
+    <rect x="2.5" y="5.5" width="11" height="4" rx="0.8" fill="currentColor" stroke="none" />
+    <path d="M4 12h8" opacity="0.55" />
+  </svg>
+);
+
 export const IconRotateLeft = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M2.5 8a5.5 5.5 0 1 1 1.8 4.1" />

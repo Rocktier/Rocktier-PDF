@@ -15,6 +15,7 @@ import {
   IconNote,
   IconOpen,
   IconPlus,
+  IconRedact,
   IconRedo,
   IconRotateLeft,
   IconRotateRight,
@@ -38,6 +39,8 @@ interface ToolbarProps {
   theme: 'dark' | 'light';
   markupTool: AnnotTool | null;
   onMarkupTool: (tool: AnnotTool | null) => void;
+  redactActive: boolean;
+  onRedactTool: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -70,6 +73,8 @@ export function Toolbar({
   theme,
   markupTool,
   onMarkupTool,
+  redactActive,
+  onRedactTool,
   onOpen,
   onSave,
   onSaveAs,
@@ -217,6 +222,14 @@ export function Toolbar({
         title={t('markup.note')}
       >
         <IconNote />
+      </button>
+      <button
+        className={`btn btn-icon${redactActive ? ' active btn-danger' : ''}`}
+        onClick={onRedactTool}
+        disabled={!doc || busy}
+        title={t('redact.toolbar')}
+      >
+        <IconRedact />
       </button>
       <button
         className={`btn${markupTool === 'sign' ? ' active' : ''}`}

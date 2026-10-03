@@ -102,6 +102,24 @@ export const en = {
     done: 'Markup added',
   },
 
+  redact: {
+    toolbar: 'Redact',
+    hint: 'Drag rectangles over the text to remove, then apply',
+    barCount: '{count} region(s) marked',
+    apply: 'Apply redaction',
+    cancel: 'Cancel',
+    confirmTitle: 'Apply redaction?',
+    confirmBody:
+      '{count} region(s) will be redacted. The text underneath is permanently deleted from the document — not covered up, deleted.',
+    confirmWarningTitle: 'This cannot be undone',
+    confirmWarning:
+      'The underlying text is permanently removed. After saving, no PDF reader can select, copy, or recover it — not even this app. Undo only works before you save.',
+    confirmRun: 'Delete text permanently',
+    done: 'Redacted {count} text object(s)',
+    crossed: '{count} object(s) extended past a region and were removed entirely.',
+    residual: 'Warning: text may still remain in {count} region(s). Verify before sharing.',
+  },
+
   form: {
     title: 'Fill form',
     empty: 'This PDF has no fillable form fields.',

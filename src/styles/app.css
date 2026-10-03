@@ -360,6 +360,67 @@
   background: var(--bg-card-hover);
 }
 
+/* ── Redaction ────────────────────────────────────────────────── */
+/* 已标记待应用的脱敏区域：虚线红框罩在页面上（确认前不画成黑块，
+   用户要能看清自己圈了什么）。 */
+.redact-box {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px dashed var(--danger);
+  background: rgba(230, 69, 55, 0.18);
+  z-index: 4;
+}
+
+.annot-preview.redact {
+  border: 1.5px dashed var(--danger);
+  background: rgba(230, 69, 55, 0.3);
+}
+
+/* 应用/取消浮出条：与 FindBar 同位同款，红色系提醒这里等着一个不可逆决定。 */
+.redactbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.redactbar-count {
+  font-size: 12px;
+  color: var(--danger);
+  padding: 0 4px;
+}
+
+/* 确认弹层里的警示块：danger 边框 + 加粗标题 + 完整文字说明——
+   危险语义不能只靠颜色承载（色弱、打印、读屏都要求文字在场）。 */
+.redact-warning {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.redact-warning strong {
+  display: block;
+  color: var(--danger);
+  margin-bottom: 4px;
+}
+
+.redact-warning p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 /* ── Viewer wrapper + find bar ────────────────────────────────── */
 .viewer-wrap {
   position: relative;

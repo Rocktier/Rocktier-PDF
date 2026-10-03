@@ -11,8 +11,8 @@ use tauri::{AppHandle, State};
 
 use crate::pdf::{
     degrees_of, doc_info, init_pdfium, parse_ranges, render_page as render_page_impl,
-    rotation_of, DocumentInfo, FormFieldInfo, MarkupKind, MarkupRect, PathResult, RenderedPage,
-    SearchHit, SplitMode, StampKind,
+    rotation_of, DocumentInfo, FormFieldInfo, MarkupKind, MarkupRect, PathResult, RedactRegion,
+    RenderedPage, SearchHit, SplitMode, StampKind,
 };
 use crate::state::{AppState, OpenDoc};
 
@@ -680,6 +680,51 @@ pub async fn stamp_document(
     crate::pdf::apply_stamp(&mut doc.document, kind, &text, font_size, margin, opacity)?;
     doc.dirty = true;
     doc_info(&doc.document, &doc.path, true)
+}
+
+/* ── Redaction ───────────────────────────────────────────────────── */
+
+/// 脱敏命令的返回：文档新状态 + 统计/告警。
+///
+/// 告警是结构化字段（不是拼好的英文串）：crossed/residual 的文案由前端
+/// i18n 渲染，en/zh 各自成句。警告不阻塞——v1 的语义是「如实上报，由用户
+/// 决定下一步」，而不是替用户回滚。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedactOutcome {
+    /// 删除的文本对象数。
+    pub removed: usize,
+    /// 跨出区域边界、被整对象删除的文本对象数。
+    pub crossed: usize,
+    /// 应用后重扫仍在区域内发现文本对象的区域数（校验告警）。
+    pub residual_regions: usize,
+    /// 脱敏后的文档状态（dirty = true）。
+    pub info: DocumentInfo,
+}
+
+/// 真脱敏：永久删除区域内底层文字并盖不透明黑矩形。
+///
+/// 这是写后即不可逆的操作（保存后任何阅读器都复制不出原文字）——撤销栈
+/// 能回滚的是**这次操作**（字节快照），不是已经保存出去的文件。确认弹层
+/// 必须写明这一点；命令层照旧只负责闸门、快照与同步 dirty。
+#[tauri::command]
+pub async fn redact_regions(
+    state: State<'_, AppState>,
+    regions: Vec<RedactRegion>,
+) -> CmdResult<RedactOutcome> {
+    ensure_write_allowed()?;
+    let mut guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_mut().ok_or_else(|| "No document is open".to_string())?;
+
+    push_undo(doc);
+    let summary = crate::pdf::redact_regions(&mut doc.document, &regions)?;
+    doc.dirty = true;
+    Ok(RedactOutcome {
+        removed: summary.removed,
+        crossed: summary.crossed,
+        residual_regions: summary.residual_regions,
+        info: doc_info(&doc.document, &doc.path, true)?,
+    })
 }
 
 /* ── Annotations ─────────────────────────────────────────────────── */
