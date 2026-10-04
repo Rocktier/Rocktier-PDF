@@ -30,7 +30,7 @@ jobs:
           fi
           echo "activation key is configured"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy
       - name: Install qpdf + provision the sidecar
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
         with:
           targets: aarch64-apple-darwin
 
@@ -190,7 +190,7 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
         with:
           # tauri-windows-bundle builds with an explicit --target, so it has to
           # be present or the MSIX step fails.
