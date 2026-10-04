@@ -214,7 +214,7 @@ export const zh: Strings = {
     codePlaceholder: 'RKT-…',
     activate: '激活',
     activating: '正在激活…',
-    buy: '购买 — $4.99',
+    buy: '购买 — $9.99',
     close: '关闭',
     invalid: '该激活码未被接受。请检查是否输错（不区分大小写）。',
     wrongProduct: '这个激活码属于另一个 Rocktier 应用。每个应用各有自己的码，或者用全家桶（可解锁全部）。',

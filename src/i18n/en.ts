@@ -215,7 +215,7 @@ export const en = {
     codePlaceholder: 'RKT-…',
     activate: 'Activate',
     activating: 'Activating…',
-    buy: 'Buy — $4.99',
+    buy: 'Buy — $9.99',
     close: 'Close',
     invalid: 'That code was not accepted. Check it for a typo — the code is not case-sensitive.',
     wrongProduct:
