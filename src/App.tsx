@@ -49,7 +49,11 @@ type Theme = 'auto' | 'light' | 'dark';
 type Resolved = 'light' | 'dark';
 type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | 'license' | null;
 
-const THEME_KEY = 'rocktier-pdf-editor.theme';
+/* 2026-10-04 键改名：家族命名空间统一用「.」（此前 PDF 用的是 "rocktier-pdf-editor.theme"，
+   其余产品用 "rocktier.theme"）。改名是为了跨产品一致，不是为了折腾用户，所以读取时
+   仍回落旧键 —— 否则老用户升级后主题被静默重置成默认值。旧键不删。 */
+const THEME_KEY = 'rocktier.theme';
+const THEME_KEY_LEGACY = 'rocktier-pdf-editor.theme';
 const THEME_CYCLE: readonly Theme[] = ['auto', 'light', 'dark'];
 
 export function App() {
@@ -889,7 +893,7 @@ export function App() {
 /** 读存储。三态引入前这里只认 dark/light；老用户的值原样保留，不需要迁移。 */
 function readTheme(): Theme {
   try {
-    const saved = localStorage.getItem(THEME_KEY);
+    const saved = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(THEME_KEY_LEGACY);
     if (saved === 'dark' || saved === 'light' || saved === 'auto') return saved;
   } catch {
     /* ignore */
