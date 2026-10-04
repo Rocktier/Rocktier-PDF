@@ -273,7 +273,7 @@ export function Toolbar({
         onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
         title={t('toolbar.language')}
       >
-        {lang === 'en' ? 'EN' : '中'}
+        {lang === 'zh' ? 'EN' : '中文'}
       </button>
 
       {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），三态靠 data-mode。
