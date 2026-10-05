@@ -283,8 +283,9 @@ pub fn write_markdown(path: &Path, markdown: &str) -> Result<u64, String> {
             std::fs::create_dir_all(dir).map_err(|e| format!("Cannot create folder: {e}"))?;
         }
     }
-    std::fs::write(path, markdown.as_bytes()).map_err(|e| format!("Cannot write Markdown: {e}"))?;
-    Ok(markdown.as_bytes().len() as u64)
+    // as_bytes() 是多余的：String 本身就能传给 fs::write（clippy: needless_as_bytes）
+    std::fs::write(path, markdown).map_err(|e| format!("Cannot write Markdown: {e}"))?;
+    Ok(markdown.len() as u64)
 }
 
 /// 供前端消费的转换结果。
@@ -364,7 +365,8 @@ mod tests {
             Glyph { text: t.into(), size: 10.0, bold: false, italic: false,
                     x0: x, x1: x + 5.0, y0: y, y1: y + 7.0, rotation_deg: deg }
         }
-        let glyphs = vec![
+        // 数组而非 vec![]：clippy useless_vec 会把这个要求改成字面量数组
+        let glyphs = [
             g("6", 30.0, 700.0, 270.0),   // 页边竖排行号
             g("Body", 300.0, 700.0, 0.0),  // 正文
             g("text", 300.0, 700.0, 0.0),
@@ -524,7 +526,8 @@ mod tests {
                     // 把首页渲染成 PNG —— 判断「交错」是文本层问题还是聚类问题，
                     // 只有看图才能定论
                     if let Ok(rp) = std::env::var("ROCKTIER_ACC_RENDER") {
-                        if doc.pages().len() > 0 {
+                        // 页数判断用 !is_empty() 而非 > 0（clippy: len_zero）
+                        if !doc.pages().is_empty() {
                             if let Ok(r) = crate::pdf::render_page(&doc, 0, 1400) {
                                 if let Some(b64) = r.data_url.split(',').nth(1) {
                                     use base64::Engine as _;

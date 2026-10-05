@@ -105,16 +105,15 @@ pub enum Warning {
 }
 
 /// 转换选项。
-#[derive(Debug, Clone, Copy)]
+///
+/// `Default` 是**派生**的，不是手写的 —— 曾经手写 `impl Default`，
+/// clippy 的 `derivable_impls` 报红（CI 用 `-D warnings`，直接失败）。
+/// 手写版与派生版当时等价，但**加字段时手写版不会跟着变**，编译器
+/// 也不提示，两边悄悄漂移。派生就没这个缝隙。
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
     /// 正文判定基准；为 None 时自动估计
     pub body_size: Option<f32>,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self { body_size: None }
-    }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -867,9 +866,10 @@ mod tests {
         let mut doc = doc_with(&[22.0, 16.0, 12.0]);
         // 正文必须**字符量足够** —— 3 个字符的正文会被标题的150 字符压过
         doc.push(Line {
-            text: "这是正文行，字数需要多于全部标题字之和，否则加权中位数会把标题当正文。".repeat(3).into(),
+            // .repeat() 已经返回 String，.into() 是多余转换（clippy: useless_conversion）
+            text: "这是正文行，字数需要多于全部标题字之和，否则加权中位数会把标题当正文。".repeat(3),
             size: 10.0, bold: false, italic: false,
-            x0: 100.0, x1: 200.0, baseline: 600.0, gaps: vec![],
+            x0: 100.0, x1: 200.0, baseline: 600.0, gaps: Vec::new(),
         });
         let body = estimate_body_size(&doc);
         let hmap = heading_map(&doc, body);
