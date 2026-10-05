@@ -12,6 +12,7 @@ import { RedactBar } from './components/RedactBar';
 import { RedactDialog } from './components/RedactDialog';
 import { SecurityDialog } from './components/SecurityDialog';
 import { CompressDialog } from './components/CompressDialog';
+import { MarkdownDialog } from './components/MarkdownDialog';
 import { LicenseDialog } from './components/LicenseDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
@@ -47,7 +48,16 @@ import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './
 /** 三态：auto 跟随系统 → light → dark → auto（家族 §6.5 唯一状态机）。 */
 type Theme = 'auto' | 'light' | 'dark';
 type Resolved = 'light' | 'dark';
-type Dialog = 'merge' | 'split' | 'stamp' | 'security' | 'form' | 'compress' | 'license' | null;
+type Dialog =
+  | 'merge'
+  | 'split'
+  | 'stamp'
+  | 'security'
+  | 'form'
+  | 'compress'
+  | 'markdown'
+  | 'license'
+  | null;
 
 /* 2026-10-04 键改名：家族命名空间统一用「.」（此前 PDF 用的是 "rocktier-pdf-editor.theme"，
    其余产品用 "rocktier.theme"）。改名是为了跨产品一致，不是为了折腾用户，所以读取时
@@ -206,6 +216,10 @@ export function App() {
           break;
         case 'save-as':
           void saveAs();
+          break;
+        case 'export-markdown':
+          // 转换需要已打开的文档；没打开时静默忽略（菜单项可能仍可点）
+          if (pdf.doc) setDialog('markdown');
           break;
         case 'undo':
           void pdf.stepHistory('undo');
@@ -828,6 +842,12 @@ export function App() {
           defaultName={fileStem(doc.path) + '-compressed.pdf'}
           onClose={() => setDialog(null)}
           onRun={runCompress}
+        />
+      ) : null}
+      {dialog === 'markdown' && doc ? (
+        <MarkdownDialog
+          defaultName={fileStem(doc.path) + '.md'}
+          onClose={() => setDialog(null)}
         />
       ) : null}
       {dialog === 'form' && doc ? (

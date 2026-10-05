@@ -77,6 +77,16 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
             &save_i,
             &save_as_i,
             &PredefinedMenuItem::separator(app)?,
+            // 路线图 R4：导出为 Markdown。放File 菜单而非工具栏 ——
+            // 它是「输出到另一种格式」，与导出 PNG 同类，且低频。
+            &MenuItem::with_id(
+                app,
+                "export-markdown",
+                l("导出为 Markdown…", "Export as Markdown…"),
+                true,
+                Some("CmdOrCtrl+Shift+M"),
+            )?,
+            &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;

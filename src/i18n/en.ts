@@ -229,6 +229,24 @@ export const en = {
     privacyNote:
       'Activating sends the code to rocktier.com once and stores the signed reply locally. Nothing else is sent.',
   },
+  markdown: {
+    title: 'Export as Markdown',
+    converting: 'Reading text and inferring structure…',
+    close: 'Close',
+    save: 'Save as .md',
+    saving: 'Saving…',
+    saveFailed: 'Could not write the Markdown file.',
+    emptyDocument:
+      'No text could be extracted from this document. It is most likely a scan — OCR is the next step for these.',
+    preview: 'Markdown preview',
+    stats:
+      '{pages} pages · {headings} headings · {paragraphs} paragraphs · {lists} list items · body text about {bodySize}pt',
+    scannedPages:
+      'No selectable text on page(s) {pages}. Scanned pages need OCR; they were skipped.',
+    tablesKept:
+      'Detected {regions} table-like area(s). Version 1 keeps them as plain text — column alignment is not reconstructed.',
+  },
+
   compress: {
     title: 'Compress PDF',
     mode: 'Size / quality',

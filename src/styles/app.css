@@ -852,3 +852,40 @@
   background: transparent;
   border: 1px solid var(--text-tertiary, var(--text-muted, #888));
 }
+
+/* ── PDF → Markdown 预览（路线图 R4）────────────────────────────────── */
+
+/*
+ * 只读预览区。用等宽字体：结构推断的产物是要被「看结构」的，
+ * 行距与缩进本身就是信息 —— 用比例字体会把层级差异抹平。
+ */
+.md-preview {
+  width: 100%;
+  min-height: 320px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+}
+
+/* 告警行不只靠颜色 —— 左侧描边给出形状，另配文案（见 MarkdownDialog 头注） */
+.md-preview + .hint,
+.hint[role='status'] {
+  border-left: 2px solid var(--accent-warn);
+  padding-left: 8px;
+  margin-top: 6px;
+}
+
+.hint[role='alert'] {
+  border-left: 2px solid var(--danger);
+  padding-left: 8px;
+  margin-top: 6px;
+}

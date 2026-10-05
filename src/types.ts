@@ -115,3 +115,35 @@ export type SplitMode =
   | { kind: 'everyN'; n: number }
   /** Explicit page ranges, e.g. "1-3,5,8-". */
   | { kind: 'ranges'; ranges: string };
+
+/* ── PDF → Markdown（路线图 R4）───────────────────────────────────────── */
+
+/** 转换统计 —— 前端要如实展示，不能只给 markdown 让用户以为转换完美。 */
+export interface MarkdownStats {
+  pages: number;
+  lines: number;
+  headings: number;
+  paragraphs: number;
+  listItems: number;
+  tableishRegions: number;
+  /** 识别到的正文字号，供用户核对推断是否合理 */
+  bodySize: number;
+}
+
+/**
+ * 非致命问题。**每一条都必须让用户看到**：
+ * 表格未转换、疑似扫描件会直接影响结果可用性。
+ */
+export type MarkdownWarning =
+  /** 该页几乎取不到文字 —— 很可能是扫描件，需要 OCR */
+  | { kind: 'looksScanned'; page: number }
+  /** 检出疑似表格；v1 只输出纯文本，不猜表格结构 */
+  | { kind: 'tablesNotConverted'; regions: number }
+  /** 全文没有可提取文字 */
+  | { kind: 'emptyDocument' };
+
+export interface MarkdownConversion {
+  markdown: string;
+  stats: MarkdownStats;
+  warnings: MarkdownWarning[];
+}

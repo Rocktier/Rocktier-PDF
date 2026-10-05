@@ -224,6 +224,20 @@ export const zh: Strings = {
     privacyNote:
       '激活会把激活码发送到 rocktier.com 一次，并把签名回执保存在本机。除此之外不传输任何内容。',
   },
+  markdown: {
+    title: '导出为 Markdown',
+    converting: '正在读取文字并推断结构…',
+    close: '关闭',
+    save: '存为 .md',
+    saving: '正在保存…',
+    saveFailed: '无法写入 Markdown 文件。',
+    emptyDocument: '这份文档取不到任何文字，很可能是扫描件——这类文件需要 OCR。',
+    preview: 'Markdown 预览',
+    stats: '{pages} 页 · {headings} 个标题 · {paragraphs} 个段落 · {lists} 个列表项 · 正文约 {bodySize}pt',
+    scannedPages: '第 {pages} 页没有可选文字，扫描页需要 OCR，已跳过。',
+    tablesKept: '检出 {regions} 处疑似表格区域。第一个版本只保留纯文本，不还原列对齐。',
+  },
+
   compress: {
     title: '压缩 PDF',
     mode: '大小 / 画质',

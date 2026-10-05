@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import type {
   DocumentInfo,
+  MarkdownConversion,
   FormFieldInfo,
   MarkupKind,
   MarkupRect,
@@ -378,4 +379,24 @@ export function formatBytes(bytes: number): string {
 export function fileStem(path: string): string {
   const name = path.split(/[\\/]/).pop() ?? path;
   return name.replace(/\.pdf$/i, '');
+}
+
+/* ── PDF → Markdown（路线图 R4）──────────────────────────────────────── */
+
+/** 预览转换结果（纯读，不写盘）。 */
+export async function pdfToMarkdown(): Promise<MarkdownConversion> {
+  return invoke<MarkdownConversion>('pdf_to_markdown');
+}
+
+/** 转成 Markdown 并写入 `outputPath`。 */
+export async function saveMarkdown(outputPath: string): Promise<PathResult> {
+  return invoke<PathResult>('pdf_save_markdown', { outputPath });
+}
+
+/** 选一个 `.md` 保存位置（PDF→Markdown 导出用）。 */
+export async function pickMarkdownPath(defaultName: string): Promise<string | null> {
+  return saveDialog({
+    defaultPath: defaultName,
+    filters: [{ name: 'Markdown', extensions: ['md'] }],
+  });
 }
