@@ -241,6 +241,8 @@ export const en = {
     preview: 'Markdown preview',
     stats:
       '{pages} pages · {headings} headings · {paragraphs} paragraphs · {lists} list items · body text about {bodySize}pt',
+    emptyDocumentWarning:
+      'No selectable text anywhere in this document. This is almost certainly a scan, so nothing could be converted. Open it in Rocktier OCR first, then export from there.',
     scannedPages:
       'No selectable text on page(s) {pages}. Scanned pages need OCR; they were skipped.',
     tablesKept:

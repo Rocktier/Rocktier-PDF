@@ -78,6 +78,7 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
       (w): w is Extract<MarkdownWarning, { kind: 'tablesNotConverted' }> =>
         w.kind === 'tablesNotConverted',
     )?.regions ?? 0;
+  const isEmpty = result?.warnings.some((w) => w.kind === 'emptyDocument') ?? false;
 
   return (
     <Modal
@@ -118,6 +119,11 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
           </p>
 
           {/* 告警区：形状 + 文案，不只靠颜色 —— 见文件头注释 */}
+          {isEmpty && (
+            <p className="hint" role="status">
+              {t('markdown.emptyDocumentWarning')}
+            </p>
+          )}
           {scannedPages.length > 0 && (
             <p className="hint" role="status">
               {t('markdown.scannedPages', { pages: scannedPages.join(', ') })}

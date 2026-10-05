@@ -33,6 +33,11 @@ pub struct Glyph {
     pub y0: f32,
     pub x1: f32,
     pub y1: f32,
+    /// 旋转角（度）。正文恒为 0；页边竖排行号是 270。
+    ///
+    /// 存在的唯一理由：转行按 y 基线聚类，会把**任何**基线相��的
+    /// 字形并进同一行，不看角度就分不清哪个来自页边。
+    pub rotation_deg: f32,
 }
 
 /// 一行：由字符按基线与水平间距聚类而来。
@@ -456,9 +461,19 @@ fn heading_map(lines: &[Line], body: f32) -> BTreeMap<i32, u8> {
         }
         *hist.entry((l.size * 10.0).round() as i32).or_insert(0) += ink;
     }
-    // 按字符数降序排名；字符数相同时字号大者优先
+    // 按**字号降序**排名；字号相同则字符数多者优先。
+    //
+    // 曾按字符数降序排名（理由是「免得一个偶然的巨字号独占 h1」），
+    // 结果真实 demo 上层级整个反了：标题 `Facilities Inspection Report`
+    // 只有 29 字，而四个章节名加起来更多，于是章节名拿到了 h1、
+    // 文档标题只拿到 h2。
+    //
+    // 层级就该由字号决定 —— 视觉上更大的字就是更高级的标题。
+    // 水印之类的巨字号确实会误占h1，但那是另一类问题（该靠跨页重复
+    // 与边缘带剔除，见 pdf_to_md::drop_running_furniture），不该用
+    // 反转层级来规避。
     let mut ranked: Vec<(i32, usize)> = hist.into_iter().filter(|(_, ink)| *ink >= 2).collect();
-    ranked.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
+    ranked.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
     let mut map = BTreeMap::new();
     for (i, (bucket, _)) in ranked.into_iter().enumerate() {
         if i >= 4 {
@@ -581,7 +596,21 @@ pub fn lines_to_blocks(lines: &[Line], opts: Options) -> (Vec<Block>, Stats, Vec
             }
         }
 
-        // 2. 显式列表（作者明确表达的结构意图，优先于标题判定）
+        // 2. 标题（字号为主 + 加粗为辅）
+        //
+        //    ⚠️ 必须在列表**之前**判。曾把列表放前面，理由是「作者明确写了
+        //    列表符号，意图更明确」—— 结果商业文档里最常见的标题形态
+        //    `1. Summary` / `2. Equipment inventory` 全被判成列表项
+        //    （真实 demo 上 4 个章节标题漏掉 4 个）。
+        //    字号才是更硬的证据：`heading_level` 已要求 ≥1.12× 正文，
+        //    正文的列表项过不了这道门槛，两种判定不会互相吃掉。
+        if let Some(level) = heading_level(line, body, max_line_chars, &hmap) {
+            stats.headings += 1;
+            blocks.push(Block { kind: BlockKind::Heading(level), text: trimmed.to_string() });
+            continue;
+        }
+
+        // 3. 显式列表（作者明确表达的结构意图）
         if let Some((item, _)) = strip_list_marker(trimmed) {
             if !item.is_empty() {
                 // 缩进分级：按 x0 相对左边界的偏移分两档，够用且不易过拟合
@@ -591,13 +620,6 @@ pub fn lines_to_blocks(lines: &[Line], opts: Options) -> (Vec<Block>, Stats, Vec
                 blocks.push(Block { kind: BlockKind::ListItem(lvl), text: item });
                 continue;
             }
-        }
-
-        // 3. 标题（字号为主 + 加粗为辅）
-        if let Some(level) = heading_level(line, body, max_line_chars, &hmap) {
-            stats.headings += 1;
-            blocks.push(Block { kind: BlockKind::Heading(level), text: trimmed.to_string() });
-            continue;
         }
 
         // 4. 正文段落：与上一正文行间距不大则合并
@@ -758,6 +780,7 @@ mod tests {
                 x1: x + i as f32 * w + w,
                 y0: baseline,
                 y1: baseline + size * 0.7,
+                rotation_deg: 0.0,
             })
             .collect()
     }
@@ -1009,6 +1032,74 @@ mod tests {
         // 正文不应被并进引用块
         assert!(md.contains("normal body text"), "{}", md);
         assert_eq!(blocks.iter().filter(|b| b.kind == BlockKind::Paragraph).count(), 1);
+    }
+
+    /// 编号章节名（`1. Summary`）必须是**标题**，不能是列表项。
+    ///
+    /// 踩过的坑：曾把列表判定排在标题之前，理由是「作者写了列表符号，
+    /// 意图更明确」。真实 demo 上 4 个章节标题全部漏判成列表项 ——
+    /// 而 `1. / 2. / 3.` 编号章节是商业与法律文档最常见的标题形态。
+    #[test]
+    fn 编号章节名_判为标题而非列表项() {
+        let mut g = Vec::new();
+        g.extend(line_of(100.0, 700.0, 10.0, "Introductory sentence here.", false));
+        g.extend(line_of(100.0, 672.0, 13.0, "1. Summary", true));
+        g.extend(line_of(100.0, 650.0, 10.0, "Body of the summary section.", false));
+        g.extend(line_of(100.0, 622.0, 13.0, "2. Equipment inventory", true));
+        // 同字号的真列表项仍然是列表（字号是硬证据）
+        g.extend(line_of(100.0, 594.0, 10.0, "- Replace the supply filters.", false));
+
+        let lines = glyphs_to_lines(&g);
+        let (blocks, stats, _) = lines_to_blocks(&lines, Options::default());
+
+        let heads: Vec<&str> = blocks
+            .iter()
+            .filter(|b| matches!(b.kind, BlockKind::Heading(_)))
+            .map(|b| b.text.as_str())
+            .collect();
+        assert_eq!(heads, vec!["1. Summary", "2. Equipment inventory"], "编号章节名应判为标题");
+
+        assert_eq!(stats.headings, 2, "标题数");
+        assert_eq!(stats.list_items, 1, "只有真列表项算列表");
+    }
+
+    /// 层级由**字号**决定，不由字符数决定。
+    ///
+    /// 曾按字符数排名，于是「字符更多的章节名」抢走h1、文档标题降级成 h2 ——
+    /// 层级整个反过来。
+    #[test]
+    fn 标题层级_按字号而非字符数排名() {
+        let mut g = Vec::new();
+        // 文档标题：字号最大但字数少
+        g.extend(line_of(100.0, 760.0, 20.0, "Facilities Inspection Report", true));
+        // 四个章节名：字号次之但字数多；每个章节名下都跟两行正文 ——
+        // 必须有正文，否则 estimate_body_size 会把 13pt 当成正文基准，
+        // 那时 13pt 自然过不了「≥1.12× 正文」这道门槛。
+        for (i, t) in ["1. Summary", "2. Equipment inventory", "3. Actions", "4. Sign-off"]
+            .iter()
+            .enumerate()
+        {
+            let top = 730.0 - i as f32 * 60.0;
+            g.extend(line_of(100.0, top, 13.0, t, true));
+            g.extend(line_of(100.0, top - 18.0, 10.0, "Body paragraph for this section.", false));
+            g.extend(line_of(100.0, top - 32.0, 10.0, "A second line of running text.", false));
+        }
+
+        let lines = glyphs_to_lines(&g);
+        let (blocks, _, _) = lines_to_blocks(&lines, Options::default());
+
+        let lvl = |t: &str| {
+            blocks
+                .iter()
+                .find(|b| b.text == t)
+                .map(|b| b.kind)
+                .and_then(|k| match k {
+                    BlockKind::Heading(l) => Some(l),
+                    _ => None,
+                })
+        };
+        assert_eq!(lvl("Facilities Inspection Report"), Some(1), "最大字号应是 h1");
+        assert_eq!(lvl("1. Summary"), Some(2), "次大字号应是 h2");
     }
 
     #[test]

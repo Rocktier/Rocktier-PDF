@@ -234,6 +234,8 @@ export const zh: Strings = {
     emptyDocument: '这份文档取不到任何文字，很可能是扫描件——这类文件需要 OCR。',
     preview: 'Markdown 预览',
     stats: '{pages} 页 · {headings} 个标题 · {paragraphs} 个段落 · {lists} 个列表项 · 正文约 {bodySize}pt',
+    emptyDocumentWarning:
+      '整份文档都取不到可选文字，几乎可以确定是扫描件，因此没有任何内容可转换。请先用 Rocktier OCR 处理，再从那边导出。',
     scannedPages: '第 {pages} 页没有可选文字，扫描页需要 OCR，已跳过。',
     tablesKept: '检出 {regions} 处疑似表格区域。第一个版本只保留纯文本，不还原列对齐。',
   },
