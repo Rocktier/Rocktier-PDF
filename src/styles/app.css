@@ -876,16 +876,48 @@
   overflow: auto;
 }
 
-/* 告警行不只靠颜色 —— 左侧描边给出形状，另配文案（见 MarkdownDialog 头注） */
-.md-preview + .hint,
-.hint[role='status'] {
-  border-left: 2px solid var(--accent-warn);
-  padding-left: 8px;
-  margin-top: 6px;
+/* ── 告警行 ────────────────────────────────────────────────────────── */
+
+/*
+ * 三条通道：标签（形状 + 类型）→ 淡底 + 1px 边框（成组）→ 文案（问题 + 出路）。
+ *
+ * 曾用「2px 彩色左边框」表示告警，并自注「不只靠颜色」—— 但那条描边
+ * 恰恰是设计准则明令禁止的默认做法，而且它只给形状不给类型：
+ * 「疑似扫描件」和「表格未转换」会长得一模一样。改成带文字的标签。
+ *
+ * 边框只给 1px：颜色用来分组，不用来划界。
+ */
+.md-warn {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
-.hint[role='alert'] {
-  border-left: 2px solid var(--danger);
-  padding-left: 8px;
-  margin-top: 6px;
+.md-warn-error {
+  color: var(--text-primary);
+  border-color: var(--danger);
+}
+
+/* 标签是「这是什么类型的告警」的答案 —— 用形状 + 文字，不靠颜色单独承担 */
+.md-warn-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border-radius: 3px;
+}
+
+.md-warn-error .md-warn-tag {
+  color: var(--danger);
 }

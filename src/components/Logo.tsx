@@ -166,6 +166,21 @@ export const IconImagesToPdf = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+/**
+ * Markdown 徽标：圆角框 + M + 向下箭头。
+ *
+ * 手绘而非借用 Unicode「Ⓜ」：图标系统的stroke 宽度（1.4）、圆头圆角、
+ * 16×16 画布都得跟其余 30 个图标一致，Unicode 字形做不到，
+ * 而且各平台渲染差异会更大。
+ */
+export const IconMarkdown = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="1.5" y="3" width="13" height="10" rx="2.4" />
+    <path d="M3.8 11V5.6l1.5 2 1.5-2V11" />
+    <path d="M10.4 7.6v3.8M8.9 10l1.5 1.5 1.5-1.5" />
+  </svg>
+);
+
 export const IconStamp = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <rect x="2.5" y="9.5" width="11" height="4" rx="1" />

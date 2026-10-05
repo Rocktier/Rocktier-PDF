@@ -9,6 +9,7 @@ import {
   IconHighlight,
   IconImagesToPdf,
   IconLock,
+  IconMarkdown,
   IconMerge,
   IconMinus,
   IconMoon,
@@ -54,6 +55,7 @@ interface ToolbarProps {
   onSign: () => void;
   onSecurity: () => void;
   onCompress: () => void;
+  onMarkdown: () => void;
   onForm: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -88,6 +90,7 @@ export function Toolbar({
   onSign,
   onSecurity,
   onCompress,
+  onMarkdown,
   onForm,
   onUndo,
   onRedo,
@@ -138,10 +141,12 @@ export function Toolbar({
 
       <div className="toolbar-sep" />
 
-      <button className="btn btn-icon" onClick={onUndo} disabled={!doc || busy} title={t('toolbar.undo')}>
+      <button className="btn btn-icon" onClick={onUndo} disabled={!doc || busy} title={t('toolbar.undo')}
+        aria-label={t('toolbar.undo')}>
         <IconUndo />
       </button>
-      <button className="btn btn-icon" onClick={onRedo} disabled={!doc || busy} title={t('toolbar.redo')}>
+      <button className="btn btn-icon" onClick={onRedo} disabled={!doc || busy} title={t('toolbar.redo')}
+        aria-label={t('toolbar.redo')}>
         <IconRedo />
       </button>
 
@@ -158,10 +163,22 @@ export function Toolbar({
 
       <div className="toolbar-sep" />
 
-      <button className="btn" onClick={() => onRotate(-90)} disabled={!doc || busy}>
+      <button
+        className="btn btn-icon"
+        onClick={() => onRotate(-90)}
+        disabled={!doc || busy}
+        title={t('toolbar.rotateLeft')}
+        aria-label={t('toolbar.rotateLeft')}
+      >
         <IconRotateLeft />
       </button>
-      <button className="btn" onClick={() => onRotate(90)} disabled={!doc || busy}>
+      <button
+        className="btn btn-icon"
+        onClick={() => onRotate(90)}
+        disabled={!doc || busy}
+        title={t('toolbar.rotateRight')}
+        aria-label={t('toolbar.rotateRight')}
+      >
         <IconRotateRight />
       </button>
       <button className="btn btn-danger" onClick={onDelete} disabled={!doc || busy || !hasSelection}>
@@ -170,23 +187,98 @@ export function Toolbar({
       </button>
       <button className="btn" onClick={onExtract} disabled={!doc || busy || !hasSelection}>
         <IconExtract />
-        {t('toolbar.extract')}
+        {t('toolbar.extractPages')}
       </button>
       <button className="btn" onClick={onCopyText} disabled={!doc || busy || !hasSelection}>
         <IconCopy />
         {t('toolbar.copyText')}
       </button>
-      <button className="btn" onClick={onStamp} disabled={!doc || busy}>
+
+      {/*路线图 R4：家族唯一的差异化能力（iLovePDF 纯云端、PDF24 在
+          macOS 上只能上传），所以给足权重—— 图标 + 文字 + 强调色。
+          它也是这一组里唯一「输出到另一种格式」而非「编辑当前页」的动作，
+          故单独分组。 */}
+      <div className="toolbar-sep" />
+
+      <button
+        className="btn btn-primary"
+        onClick={onMarkdown}
+        disabled={!doc || busy}
+        title={t('toolbar.markdown')}
+      >
+        <IconMarkdown />
+        {t('toolbar.markdown')}
+      </button>
+
+      <div className="toolbar-sep" />
+
+      {/* 以下都是低频动作 —— 按家族规则「低频用纯图标」收窄，
+          每个都必须带 title + aria-label，否则图标成了黑盒。
+          纯图标比带字省约 50px，这一组省出的宽度正是上面能塞进
+          Markdown 按钮的原因（.toolbar 曾因带字按钮过宽而换行）。 */}
+      <button
+        className="btn btn-icon"
+        onClick={onStamp}
+        disabled={!doc || busy}
+        title={t('toolbar.stamp')}
+        aria-label={t('toolbar.stamp')}
+      >
         <IconStamp />
-        {t('stamp.pageNumbers')}
       </button>
-      <button className="btn" onClick={onExportImages} disabled={!doc || busy}>
+      <button
+        className="btn btn-icon"
+        onClick={onExportImages}
+        disabled={!doc || busy}
+        title={t('toolbar.exportImages')}
+        aria-label={t('toolbar.exportImages')}
+      >
         <IconExportImages />
-        {t('toolbar.exportImages')}
       </button>
-      <button className="btn" onClick={onImagesToPdf} disabled={busy}>
+      <button
+        className="btn btn-icon"
+        onClick={onImagesToPdf}
+        disabled={busy}
+        title={t('toolbar.imagesToPdf')}
+        aria-label={t('toolbar.imagesToPdf')}
+      >
         <IconImagesToPdf />
-        {t('toolbar.imagesToPdf')}
+      </button>
+      <button
+        className={`btn btn-icon${markupTool === 'sign' ? ' active' : ''}`}
+        onClick={onSign}
+        disabled={!doc || busy}
+        // P0-15：功能入口处如实声明这是视觉图章，不是数字签名。
+        title={t('sign.tooltip')}
+        aria-label={t('toolbar.sign')}
+      >
+        <IconSign />
+      </button>
+      <button
+        className="btn btn-icon"
+        onClick={onSecurity}
+        disabled={!doc || busy}
+        title={t('toolbar.security')}
+        aria-label={t('toolbar.security')}
+      >
+        <IconLock />
+      </button>
+      <button
+        className="btn btn-icon"
+        onClick={onCompress}
+        disabled={!doc || busy}
+        title={t('toolbar.compress')}
+        aria-label={t('toolbar.compress')}
+      >
+        <IconCompress />
+      </button>
+      <button
+        className="btn btn-icon"
+        onClick={onForm}
+        disabled={!doc || busy}
+        title={t('toolbar.fillForm')}
+        aria-label={t('toolbar.fillForm')}
+      >
+        <IconForm />
       </button>
 
       <div className="toolbar-sep" />
@@ -196,6 +288,7 @@ export function Toolbar({
         onClick={() => onMarkupTool(markupTool === 'highlight' ? null : 'highlight')}
         disabled={!doc || busy}
         title={t('markup.highlight')}
+        aria-label={t('markup.highlight')}
       >
         <IconHighlight />
       </button>
@@ -204,6 +297,7 @@ export function Toolbar({
         onClick={() => onMarkupTool(markupTool === 'underline' ? null : 'underline')}
         disabled={!doc || busy}
         title={t('markup.underline')}
+        aria-label={t('markup.underline')}
       >
         <IconUnderline />
       </button>
@@ -212,6 +306,7 @@ export function Toolbar({
         onClick={() => onMarkupTool(markupTool === 'strikeout' ? null : 'strikeout')}
         disabled={!doc || busy}
         title={t('markup.strikeout')}
+        aria-label={t('markup.strikeout')}
       >
         <IconStrikeout />
       </button>
@@ -220,6 +315,7 @@ export function Toolbar({
         onClick={() => onMarkupTool(markupTool === 'note' ? null : 'note')}
         disabled={!doc || busy}
         title={t('markup.note')}
+        aria-label={t('markup.note')}
       >
         <IconNote />
       </button>
@@ -228,41 +324,22 @@ export function Toolbar({
         onClick={onRedactTool}
         disabled={!doc || busy}
         title={t('redact.toolbar')}
+        aria-label={t('redact.toolbar')}
       >
         <IconRedact />
-      </button>
-      <button
-        className={`btn${markupTool === 'sign' ? ' active' : ''}`}
-        onClick={onSign}
-        disabled={!doc || busy}
-        // P0-15：功能入口处如实声明这是视觉图章，不是数字签名。
-        title={t('sign.tooltip')}
-      >
-        <IconSign />
-        {t('toolbar.sign')}
-      </button>
-      <button className="btn" onClick={onSecurity} disabled={!doc || busy}>
-        <IconLock />
-        {t('toolbar.security')}
-      </button>
-      <button className="btn" onClick={onCompress} disabled={!doc || busy}>
-        <IconCompress />
-        {t('toolbar.compress')}
-      </button>
-      <button className="btn" onClick={onForm} disabled={!doc || busy}>
-        <IconForm />
-        {t('toolbar.fillForm')}
       </button>
 
       <div className="toolbar-spacer" />
 
-      <button className="btn btn-icon" onClick={() => stepZoom(-1)} disabled={!doc} title={t('zoom.out')}>
+      <button className="btn btn-icon" onClick={() => stepZoom(-1)} disabled={!doc} title={t('zoom.out')}
+        aria-label={t('zoom.out')}>
         <IconMinus />
       </button>
       <span className="mono muted" style={{ minWidth: 44, textAlign: 'center', fontSize: 11 }}>
         {Math.round(zoom * 100)}%
       </span>
-      <button className="btn btn-icon" onClick={() => stepZoom(1)} disabled={!doc} title={t('zoom.in')}>
+      <button className="btn btn-icon" onClick={() => stepZoom(1)} disabled={!doc} title={t('zoom.in')}
+        aria-label={t('zoom.in')}>
         <IconPlus />
       </button>
 
@@ -272,6 +349,7 @@ export function Toolbar({
         className="btn btn-icon lang-toggle"
         onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
         title={t('toolbar.language')}
+        aria-label={t('toolbar.language')}
       >
         {lang === 'zh' ? 'EN' : '中文'}
       </button>

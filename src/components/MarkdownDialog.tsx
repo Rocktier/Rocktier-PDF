@@ -101,7 +101,8 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
     >
       {loading && <p className="hint">{t('markdown.converting')}</p>}
       {error && (
-        <p className="hint" role="alert">
+        <p className="md-warn md-warn-error" role="alert">
+          <span className="md-warn-tag">{t('markdown.tag.error')}</span>
           {error}
         </p>
       )}
@@ -118,19 +119,26 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
             })}
           </p>
 
-          {/* 告警区：形状 + 文案，不只靠颜色 —— 见文件头注释 */}
+          {/* 告警区。三条通道，不依赖颜色单通道：
+              标签（形状 + 文字，可辨识类型）→ 淡底 + 1px 边框（分组）
+              → 正文文案（问题 + 怎么办）。
+              刻意**不用** 2px 彩色左边框 —— 那是设计准则明令禁止的默认做法，
+              而且它只给「形状」不给人「类型」，两种告警长得一样。 */}
           {isEmpty && (
-            <p className="hint" role="status">
+            <p className="md-warn" role="status">
+              <span className="md-warn-tag">{t('markdown.tag.scanned')}</span>
               {t('markdown.emptyDocumentWarning')}
             </p>
           )}
           {scannedPages.length > 0 && (
-            <p className="hint" role="status">
+            <p className="md-warn" role="status">
+              <span className="md-warn-tag">{t('markdown.tag.scanned')}</span>
               {t('markdown.scannedPages', { pages: scannedPages.join(', ') })}
             </p>
           )}
           {tableRegions > 0 && (
-            <p className="hint" role="status">
+            <p className="md-warn" role="status">
+              <span className="md-warn-tag">{t('markdown.tag.tables')}</span>
               {t('markdown.tablesKept', { regions: tableRegions })}
             </p>
           )}

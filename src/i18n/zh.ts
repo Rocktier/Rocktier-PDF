@@ -24,6 +24,9 @@ export const zh: Strings = {
     security: '密码保护',
     compress: '压缩',
     fillForm: '填写表单',
+    markdown: '转为 Markdown',
+    stamp: '页码',
+    extractPages: '提取页面',
     undo: '撤销',
     redo: '重做',
   },
@@ -234,6 +237,7 @@ export const zh: Strings = {
     emptyDocument: '这份文档取不到任何文字，很可能是扫描件——这类文件需要 OCR。',
     preview: 'Markdown 预览',
     stats: '{pages} 页 · {headings} 个标题 · {paragraphs} 个段落 · {lists} 个列表项 · 正文约 {bodySize}pt',
+    tag: { scanned: '扫描件', tables: '表格', error: '失败' },
     emptyDocumentWarning:
       '整份文档都取不到可选文字，几乎可以确定是扫描件，因此没有任何内容可转换。请先用 Rocktier OCR 处理，再从那边导出。',
     scannedPages: '第 {pages} 页没有可选文字，扫描页需要 OCR，已跳过。',

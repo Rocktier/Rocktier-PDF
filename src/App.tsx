@@ -740,6 +740,7 @@ export function App() {
         onSign={chooseSignature}
         onSecurity={() => setDialog('security')}
         onCompress={() => setDialog('compress')}
+        onMarkdown={() => setDialog('markdown')}
         onForm={() => setDialog('form')}
         onUndo={() => void pdf.stepHistory('undo')}
         onRedo={() => void pdf.stepHistory('redo')}

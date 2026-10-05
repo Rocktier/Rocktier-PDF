@@ -22,6 +22,9 @@ export const en = {
     security: 'Password protection',
     compress: 'Compress',
     fillForm: 'Fill form',
+    markdown: 'To Markdown',
+    stamp: 'Page numbers',
+    extractPages: 'Extract pages',
     undo: 'Undo',
     redo: 'Redo',
   },
@@ -241,6 +244,7 @@ export const en = {
     preview: 'Markdown preview',
     stats:
       '{pages} pages · {headings} headings · {paragraphs} paragraphs · {lists} list items · body text about {bodySize}pt',
+    tag: { scanned: 'Scan', tables: 'Table', error: 'Error' },
     emptyDocumentWarning:
       'No selectable text anywhere in this document. This is almost certainly a scan, so nothing could be converted. Open it in Rocktier OCR first, then export from there.',
     scannedPages:
