@@ -27,7 +27,7 @@ pdfium-render = "0.9.4"
 lopdf = "0.36"
 rand = "0.9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-base64 = "0.22"
+base64 = "0.23"
 log = "0.4"
 # 授权回执的离线验签（客户端只持公钥）。见 src/license.rs 顶部说明：
 # 不用对称密钥 —— 那等于把签发密钥打进每一位用户的机器里。
