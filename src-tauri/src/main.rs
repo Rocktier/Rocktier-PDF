@@ -7,7 +7,11 @@ mod formclear;
 mod imagepass;
 // 授权：试用状态与回执验签。写命令的拦截在 commands.rs，界面在 LicenseDialog。
 mod license;
+// PDF → Markdown：结构推断内核（纯逻辑，单测覆盖），取字符在 pdf_to_markdown
+mod mdconv;
 mod pdf;
+// PDF → Markdown：取字符与调度（结构推断在 mdconv）
+mod pdf_to_md;
 mod security;
 mod state;
 
