@@ -120,7 +120,7 @@ export function Toolbar({
       <div className="brand">
         <Logo />
         <span className="brand-name">
-          Rocktier PDF Editor<span className="dot">.</span>
+          Rocktier PDF<span className="dot-live" aria-hidden="true" />
         </span>
       </div>
 
