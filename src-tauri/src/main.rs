@@ -244,6 +244,8 @@ fn main() {
             commands::stamp_document,
             commands::export_page_images,
             commands::images_to_pdf,
+            commands::pdf_to_markdown,
+            commands::pdf_save_markdown,
             commands::add_markup,
             commands::add_note,
             commands::add_signature,

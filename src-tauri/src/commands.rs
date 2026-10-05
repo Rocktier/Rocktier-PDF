@@ -1200,3 +1200,46 @@ pub async fn compress_document(
     })?;
     Ok(PathResult { path: output, size })
 }
+
+/* ── PDF → Markdown（路线图 R4）───────────────────────────────────────── */
+
+/// 把当前文档转成 Markdown，**不写盘**（供前端预览）。
+///
+/// 转换是纯读操作，因此**不经过 `ensure_write_allowed`** ——
+/// 试用期内也应当能预览，只是不能导出。这与既有命令的策略一致：
+/// 写命令才拦。
+#[tauri::command]
+pub async fn pdf_to_markdown(state: State<'_, AppState>) -> CmdResult<crate::pdf_to_md::ConversionResult> {
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+
+    let (markdown, stats, warnings) =
+        crate::pdf_to_md::document_to_markdown(&doc.document, Default::default())?;
+
+    Ok(crate::pdf_to_md::ConversionResult { markdown, stats, warnings })
+}
+
+/// 转成 Markdown 并写入 `output_path`。
+///
+/// 这是**写盘**动作，走 `ensure_write_allowed()`。
+#[tauri::command]
+pub async fn pdf_save_markdown(
+    state: State<'_, AppState>,
+    output_path: String,
+) -> CmdResult<PathResult> {
+    ensure_write_allowed()?;
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+
+    let (markdown, _stats, _warnings) =
+        crate::pdf_to_md::document_to_markdown(&doc.document, Default::default())?;
+    if markdown.trim().is_empty() {
+        // 空结果写出去会得到一个 0 字节的 .md，用户只会觉得「导出了个空文件」。
+        // 扫描件请走 OCR（路线图 R4 第二段接力）。
+        return Err("NO_TEXT_EXTRACTED".to_string());
+    }
+
+    let path = PathBuf::from(&output_path);
+    let size = crate::pdf_to_md::write_markdown(&path, &markdown)?;
+    Ok(PathResult { path: output_path, size })
+}

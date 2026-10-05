@@ -1,8 +1,3 @@
-// ⚠️ WIP（2026-10-05）：本模块的推断内核与取字符层已完成且**54 个测试全绿**，
-// 但**尚未接入 Tauri 命令**，因此对外没有任何入口，编译器会报一批 dead_code。
-// 接入命令后删掉下面这行 allow，让编译器重新监督使用情况。
-#![allow(dead_code)]
-
 //! PDF → Markdown 的**结构推断**内核（纯逻辑，不依赖 pdfium）。
 //!
 //! 这一层只吃「带位置的字符」，吐出markdown 块。上层负责从 pdfium 取字符。
@@ -59,14 +54,6 @@ pub struct Line {
     pub gaps: Vec<f32>,
 }
 
-impl Line {
-    /// 行宽（pt）。注意 PDF 的 y 轴向上，而阅读顺序自上而下，
-    /// 故排序时要用 `-baseline`。
-    pub fn width(&self) -> f32 {
-        self.x1 - self.x0
-    }
-}
-
 /// 推断出的块类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockKind {
@@ -74,8 +61,6 @@ pub enum BlockKind {
     Paragraph,
     ListItem(u8),
     Quote,
-    /// 表格候选区域：v1 只保留纯文本，不猜结构
-    Tableish,
 }
 
 /// markdown 输出用的块。
@@ -86,7 +71,8 @@ pub struct Block {
 }
 
 /// 整篇转换的统计与告警（前端要如实展示，不能静默失败）。
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Stats {
     pub pages: usize,
     pub lines: usize,
@@ -99,7 +85,11 @@ pub struct Stats {
 }
 
 /// 非致命问题：如实告诉用户哪里可能不准。
-#[derive(Debug, Clone, PartialEq)]
+///
+/// 前端**必须**展示这些 —— 静默的转换结果比报错更糟：
+/// 用户会以为拿到的 Markdown 是对的。
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Warning {
     /// 该页几乎没有可提取文本 —— 极可能是扫描件
     LooksScanned { page: usize },
@@ -114,13 +104,11 @@ pub enum Warning {
 pub struct Options {
     /// 正文判定基准；为 None 时自动估计
     pub body_size: Option<f32>,
-    /// 视为列表的最左缩进（相对正文左边界的倍数）
-    pub indent_ratio: f32,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { body_size: None, indent_ratio: 0.02 }
+        Self { body_size: None }
     }
 }
 
@@ -577,11 +565,18 @@ pub fn lines_to_blocks(lines: &[Line], opts: Options) -> (Vec<Block>, Stats, Vec
             continue;
         }
 
-        // 1. 显式引用
+        // 1. 显式引用 —— 构造成真正的 Quote 块，
+        //    这样**连续的引用行会合并成同一个引用块**（markdown 语义要求），
+        //    而不是各自成为独立段落。
         if let Some(q) = strip_quote_marker(trimmed) {
             if !q.is_empty() {
-                stats.paragraphs += 1;
-                push_para(&mut blocks, &format!("> {}", q));
+                match blocks.last_mut() {
+                    Some(Block { kind: BlockKind::Quote, text }) => {
+                        text.push('\n');
+                        text.push_str(&q);
+                    }
+                    _ => blocks.push(Block { kind: BlockKind::Quote, text: q }),
+                }
                 continue;
             }
         }
@@ -646,10 +641,6 @@ pub fn lines_to_blocks(lines: &[Line], opts: Options) -> (Vec<Block>, Stats, Vec
     (blocks, stats, warnings)
 }
 
-fn push_para(blocks: &mut Vec<Block>, text: &str) {
-    blocks.push(Block { kind: BlockKind::Paragraph, text: text.to_string() });
-}
-
 // ────────────────────────────────────────────────────────────────────
 // 输出
 // ────────────────────────────────────────────────────────────────────
@@ -677,12 +668,16 @@ pub fn blocks_to_markdown(blocks: &[Block]) -> String {
                 out.push('\n');
             }
             BlockKind::Quote => {
-                out.push_str("> ");
-                out.push_str(&escape_inline(&b.text));
-                out.push_str("\n\n");
-            }
-            BlockKind::Tableish => {
-                out.push_str(&escape_inline(&b.text));
+                // ⚠️ 多行引用块必须**每行**都加`> `。
+                // 只给首行加的话，CommonMark 会把它当普通段落 + 后续行，
+                // 引用语义整个丢掉 —— 实测过 3 行引用产出：
+                //   > first quote line
+                //   second quote line
+                for line in b.text.split('\n') {
+                    out.push_str("> ");
+                    out.push_str(&escape_inline(line));
+                    out.push('\n');
+                }
                 out.push('\n');
             }
         }
@@ -985,6 +980,35 @@ mod tests {
             stats.tableish_regions >= 1 || w.iter().any(|x| matches!(x, Warning::TablesNotConverted { .. })),
             "应检出表格候选"
         );
+    }
+
+    #[test]
+    fn 引用_连续多行合并成一个引用块() {
+        // 踩过的坑：曾把引用行当普通段落、前缀拼进文本，
+        // 于是连续 3 行引用产出 3 个独立段落，而不是一个引用块。
+        let mut g = Vec::new();
+        g.extend(line_of(100.0, 700.0, 10.0, "> first quote line", false));
+        g.extend(line_of(100.0, 688.0, 10.0, "> second quote line", false));
+        g.extend(line_of(100.0, 676.0, 10.0, "> third quote line", false));
+        // 引用块之后接正文
+        g.extend(line_of(100.0, 650.0, 10.0, "normal body text", false));
+
+        let lines = glyphs_to_lines(&g);
+        let (blocks, _, _) = lines_to_blocks(&lines, Options::default());
+        let md = blocks_to_markdown(&blocks);
+
+        assert_eq!(
+            blocks.iter().filter(|b| b.kind == BlockKind::Quote).count(),
+            1,
+            "3 行引用应合成 1 个 Quote 块:\n{}",
+            md
+        );
+        assert!(md.contains("> first quote line"), "{}", md);
+        assert!(md.contains("> second quote line"), "{}", md);
+        assert!(md.contains("> third quote line"), "{}", md);
+        // 正文不应被并进引用块
+        assert!(md.contains("normal body text"), "{}", md);
+        assert_eq!(blocks.iter().filter(|b| b.kind == BlockKind::Paragraph).count(), 1);
     }
 
     #[test]

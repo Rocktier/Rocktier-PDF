@@ -1,8 +1,3 @@
-// ⚠️ WIP（2026-10-05）：本模块的推断内核与取字符层已完成且**54 个测试全绿**，
-// 但**尚未接入 Tauri 命令**，因此对外没有任何入口，编译器会报一批 dead_code。
-// 接入命令后删掉下面这行 allow，让编译器重新监督使用情况。
-#![allow(dead_code)]
-
 //! PDF → Markdown：pdfium 取字符 + 调度。
 //!
 //! 结构推断在 [`crate::mdconv`]（纯逻辑、单测覆盖）；这里只负责
@@ -129,7 +124,13 @@ pub fn write_markdown(path: &Path, markdown: &str) -> Result<u64, String> {
     Ok(markdown.as_bytes().len() as u64)
 }
 
-/// 供前端消费的转换结果（serde::Serialize 在 commands.rs 里加，这里保持纯数据）。
+/// 供前端消费的转换结果。
+///
+/// 前端必须同时拿到 `markdown` / `stats` / `warnings` 三样：
+/// 只给 markdown 会让用户以为转换是完美的，而表格未转换、疑似扫描件
+/// 这些情况**必须让他知道**。
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConversionResult {
     pub markdown: String,
     pub stats: Stats,
@@ -151,6 +152,23 @@ mod tests {
             y0: y,
             y1: y + size * 0.7,
         }
+    }
+
+    /// 逐页转行拼接：相邻两页**基线相同**也必须断成两行。
+    ///
+    /// 这是踩过的坑：曾用「页尾插哨兵字符靠 y 断层」断页，但
+    /// `glyphs_to_lines` 开头按 y 重排，哨兵必被排到全篇末尾 ——
+    /// 该设计不成立。改成逐页处理后，基线相同的两页也天然断开。
+    #[test]
+    fn 逐页拼接_基线相同的相邻页也断开() {
+        let page1 = vec![g("PageOne", 10.0, 100.0, 700.0)];
+        let page2 = vec![g("PageTwo", 10.0, 100.0, 700.0)]; // 故意同一基线
+
+        let mut lines = mdconv::glyphs_to_lines(&page1);
+        lines.extend(mdconv::glyphs_to_lines(&page2));
+
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts, vec!["PageOne", "PageTwo"], "基线相同也须断成两行");
     }
 
     #[test]
