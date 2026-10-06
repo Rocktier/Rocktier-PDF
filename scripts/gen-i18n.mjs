@@ -35,7 +35,6 @@ import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TRANSLATIONS } from "./i18n-translations.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.ROCKTIER_ROOT || join(HERE, "..", "..", "..", "..");
@@ -110,7 +109,14 @@ let missingTotal = 0;
 const written = [];
 
 for (const lang of targets) {
-  const ctx = TRANSLATIONS[lang] || {};
+  /* 译文按语言分文件（scripts/i18n/<lang>.mjs）——
+     6 个语言塞在一个文件里会到 1500 行，增量维护时容易互相覆盖。 */
+  let ctx = {};
+  try {
+    ctx = (await import(`./i18n/${lang}.mjs`)).default || {};
+  } catch {
+    console.error(`  ⚠️ 未找到 scripts/i18n/${lang}.mjs`);
+  }
   const tree = {};
   const missing = [];
 

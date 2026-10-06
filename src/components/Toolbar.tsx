@@ -1,4 +1,4 @@
-import { useI18n, useT } from '../i18n';
+import { LOCALES, useI18n, useT, type Lang } from '../i18n';
 import type { AnnotTool, DocumentInfo } from '../types';
 import {
   IconCompress,
@@ -345,14 +345,25 @@ export function Toolbar({
 
       <div className="toolbar-sep" />
 
-      <button
+      {/* 家族标准 8 语言。原来是 en↔zh 二选一 toggle —— 6 门语言接入后
+          二选一没法用，改成 <select> 下拉。
+          用原生 select 而不是自定义弹层：8 个选项不需要搜索，
+          原生控件在 Windows/macOS 上行为一致，且键盘与读屏器免费获得。
+          endonym（语言自称）—— 用户看到「Deutsch」比「German (de)」
+          更容易找到自己的语言。 */}
+      <select
         className="btn btn-icon lang-toggle"
-        onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+        value={lang}
+        onChange={(e) => setLang(e.target.value as Lang)}
         title={t('toolbar.language')}
         aria-label={t('toolbar.language')}
       >
-        {lang === 'zh' ? 'EN' : '中文'}
-      </button>
+        {LOCALES.map((l) => (
+          <option key={l.code} value={l.code}>
+            {l.endonym}
+          </option>
+        ))}
+      </select>
 
       {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），三态靠 data-mode。
           auto 态显示「屏幕」图标（跟系统走），否则显示将要去往的那一档。 */}

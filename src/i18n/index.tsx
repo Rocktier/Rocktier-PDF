@@ -3,10 +3,16 @@ import type { ReactNode } from 'react';
 import { LOCALES, type LocaleCode } from './locales';
 import { en } from './en';
 import { zh } from './zh';
+import { ja } from './ja';
+import { ko } from './ko';
+import { de } from './de';
+import { es } from './es';
+import { pt } from './pt';
+import { ar } from './ar';
 
 export type Lang = LocaleCode;
 
-const DICTS = { en, zh } as const;
+const DICTS = { en, zh, ja, ko, de, es, pt, ar } as const;
 const STORAGE_KEY = 'rocktier.pdf.lang';
 
 type Vars = Record<string, string | number>;
