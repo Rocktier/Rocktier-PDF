@@ -27,16 +27,140 @@ use state::AppState;
 /// event; predefined items are localised by the OS and keep their own
 /// accelerators. Undo/redo are custom because the document — not the webview —
 /// owns the edit history.
-fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
-    let zh = lang.starts_with("zh");
-    let l = |zhv: &'static str, en: &'static str| if zh { zhv } else { en };
+/// Menu labels for one language.
+///
+/// Why a struct instead of the previous `l(zh, en)` closure:
+/// the closure only spoke two languages, and extending it to eight would have
+/// meant turning every call site into an 8-argument function — unreadable and
+/// easy to get out of order (swapping `ja` and `ko` compiles fine and shows
+/// the wrong language). One struct per language keeps each call site to a
+/// single field.
+///
+/// Wording comes from `docs/rocktier/i18n/glossary.json`, the same source the
+/// frontend toolbars use — the native menu must not call "Save" something the
+/// toolbar calls "Save as". Unknown languages fall back to English rather than
+/// panicking, so a bad `localStorage` value degrades to a usable UI.
+struct MenuStrings {
+    open: &'static str,
+    save: &'static str,
+    save_as: &'static str,
+    export_markdown: &'static str,
+    undo: &'static str,
+    redo: &'static str,
+    file: &'static str,
+    edit: &'static str,
+    view: &'static str,
+    window: &'static str,
+    help: &'static str,
+    find: &'static str,
+    actual_size: &'static str,
+    toggle_theme: &'static str,
+    website: &'static str,
+    feedback: &'static str,
+    about: &'static str,
+    license: &'static str,
+}
 
-    let open_i = MenuItem::with_id(app, "open", l("打开…", "Open…"), true, Some("CmdOrCtrl+O"))?;
-    let save_i = MenuItem::with_id(app, "save", l("保存", "Save"), true, Some("CmdOrCtrl+S"))?;
+impl MenuStrings {
+    fn for_lang(lang: &str) -> Self {
+        // Match on the primary subtag so "zh-CN" and "zh-Hans" both land on zh.
+        let code = lang.split(['-', '_']).next().unwrap_or("");
+        match code {
+            "zh" => Self {
+                open: "打开…", save: "保存", save_as: "另存为…",
+                export_markdown: "导出为 Markdown…", undo: "撤销", redo: "重做",
+                file: "文件", edit: "编辑", view: "显示", window: "窗口",
+                help: "帮助", find: "查找", actual_size: "实际大小",
+                toggle_theme: "切换日夜模式", website: "官方网站",
+                feedback: "反馈", about: "关于 Rocktier PDF Editor",
+                license: "许可与激活…",
+            },
+            "ja" => Self {
+                open: "開く…", save: "保存", save_as: "名前を付けて保存…",
+                export_markdown: "Markdown で書き出す…", undo: "元に戻す", redo: "やり直す",
+                file: "ファイル", edit: "編集", view: "表示", window: "ウインドウ",
+                help: "ヘルプ", find: "検索", actual_size: "原寸",
+                toggle_theme: "テーマを切り替え", website: "公式サイト",
+                feedback: "フィードバック", about: "Rocktier PDF Editor について",
+                license: "ライセンス…",
+            },
+            "ko" => Self {
+                open: "열기…", save: "저장", save_as: "다른 이름으로 저장…",
+                export_markdown: "Markdown으로 내보내기…", undo: "실행 취소", redo: "다시 실행",
+                file: "파일", edit: "편집", view: "보기", window: "창",
+                help: "도움말", find: "검색", actual_size: "실제 크기",
+                toggle_theme: "테마 전환", website: "공식 웹사이트",
+                feedback: "피드백", about: "Rocktier PDF Editor 정보",
+                license: "라이선스…",
+            },
+            "de" => Self {
+                open: "Öffnen…", save: "Speichern", save_as: "Speichern unter…",
+                export_markdown: "Als Markdown exportieren…", undo: "Rückgängig", redo: "Wiederholen",
+                file: "Datei", edit: "Bearbeiten", view: "Ansicht", window: "Fenster",
+                help: "Hilfe", find: "Suchen", actual_size: "Originalgröße",
+                toggle_theme: "Design wechseln", website: "Website",
+                feedback: "Feedback", about: "Über Rocktier PDF Editor",
+                license: "Lizenz…",
+            },
+            "es" => Self {
+                open: "Abrir…", save: "Guardar", save_as: "Guardar como…",
+                export_markdown: "Exportar como Markdown…", undo: "Deshacer", redo: "Rehacer",
+                file: "Archivo", edit: "Editar", view: "Ver", window: "Ventana",
+                help: "Ayuda", find: "Buscar", actual_size: "Tamaño real",
+                toggle_theme: "Cambiar tema", website: "Sitio web",
+                feedback: "Comentarios", about: "Acerca de Rocktier PDF Editor",
+                license: "Licencia…",
+            },
+            "pt" => Self {
+                open: "Abrir…", save: "Salvar", save_as: "Salvar como…",
+                export_markdown: "Exportar como Markdown…", undo: "Desfazer", redo: "Refazer",
+                file: "Arquivo", edit: "Editar", view: "Exibir", window: "Janela",
+                help: "Ajuda", find: "Buscar", actual_size: "Tamanho real",
+                toggle_theme: "Alternar tema", website: "Site",
+                feedback: "Comentários", about: "Sobre o Rocktier PDF Editor",
+                license: "Licença…",
+            },
+            "ar" => Self {
+                open: "فتح…", save: "احفظ", save_as: "حفظ باسم…",
+                export_markdown: "تصدير كـ Markdown…", undo: "تراجع", redo: "إعادة",
+                file: "ملف", edit: "تحرير", view: "عرض", window: "نافذة",
+                help: "مساعدة", find: "ابحث", actual_size: "الحجم الحقيقي",
+                toggle_theme: "تبديل المظهر", website: "الموقع",
+                feedback: "ملاحظات", about: "حول Rocktier PDF Editor",
+                license: "الترخيص…",
+            },
+            // English is both the default and the fallback: the family convention
+            // is a fixed English default (family.json `defaultLanguage: "en"`),
+            // and an unrecognised code must still yield a usable menu.
+            _ => Self {
+                open: "Open…", save: "Save", save_as: "Save As…",
+                export_markdown: "Export as Markdown…", undo: "Undo", redo: "Redo",
+                file: "File", edit: "Edit", view: "View", window: "Window",
+                help: "Help", find: "Find", actual_size: "Actual Size",
+                toggle_theme: "Toggle Theme", website: "Website",
+                feedback: "Feedback", about: "About Rocktier PDF Editor",
+                license: "License…",
+            },
+        }
+    }
+}
+
+/// Builds the family-standard menu (App / File / Edit / View / Window / Help).
+///
+/// Called by the frontend after mount and again whenever the UI language
+/// changes. Custom items are forwarded to the frontend as a `menu-action`
+/// event; predefined items are localised by the OS and keep their own
+/// accelerators. Undo/redo are custom because the document — not the webview —
+/// owns the edit history.
+fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
+    let m = MenuStrings::for_lang(lang);
+
+    let open_i = MenuItem::with_id(app, "open", m.open, true, Some("CmdOrCtrl+O"))?;
+    let save_i = MenuItem::with_id(app, "save", m.save, true, Some("CmdOrCtrl+S"))?;
     let save_as_i = MenuItem::with_id(
         app,
         "save-as",
-        l("另存为…", "Save As…"),
+        m.save_as,
         true,
         Some("CmdOrCtrl+Shift+S"),
     )?;
@@ -52,7 +176,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
             // macOS 走 NSAboutPanel（忽略 metadata），所以这个坑只在 Windows 暴露。
             &PredefinedMenuItem::about(
                 app,
-                Some(l("关于 Rocktier PDF Editor", "About Rocktier PDF Editor")),
+                Some(m.about),
                 Some(AboutMetadata {
                     version: Some(env!("CARGO_PKG_VERSION").to_string()),
                     copyright: Some("Copyright 2026 Rocktier".to_string()),
@@ -69,7 +193,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
 
     let file_menu = Submenu::with_items(
         app,
-        l("文件", "File"),
+        m.file,
         true,
         &[
             &open_i,
@@ -82,7 +206,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
             &MenuItem::with_id(
                 app,
                 "export-markdown",
-                l("导出为 Markdown…", "Export as Markdown…"),
+                m.export_markdown,
                 true,
                 Some("CmdOrCtrl+Shift+M"),
             )?,
@@ -91,12 +215,12 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         ],
     )?;
 
-    let undo_i = MenuItem::with_id(app, "undo", l("撤销", "Undo"), true, Some("CmdOrCtrl+Z"))?;
+    let undo_i = MenuItem::with_id(app, "undo", m.undo, true, Some("CmdOrCtrl+Z"))?;
     let redo_i =
-        MenuItem::with_id(app, "redo", l("重做", "Redo"), true, Some("CmdOrCtrl+Shift+Z"))?;
+        MenuItem::with_id(app, "redo", m.redo, true, Some("CmdOrCtrl+Shift+Z"))?;
     let edit_menu = Submenu::with_items(
         app,
-        l("编辑", "Edit"),
+        m.edit,
         true,
         &[
             &undo_i,
@@ -109,13 +233,13 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         ],
     )?;
 
-    let find_i = MenuItem::with_id(app, "find", l("查找", "Find"), true, Some("CmdOrCtrl+F"))?;
+    let find_i = MenuItem::with_id(app, "find", m.find, true, Some("CmdOrCtrl+F"))?;
     let actual_i =
-        MenuItem::with_id(app, "actual-size", l("实际大小", "Actual Size"), true, None::<&str>)?;
-    let theme_i = MenuItem::with_id(app, "toggle-theme", l("切换日夜模式", "Toggle Theme"), true, None::<&str>)?;
+        MenuItem::with_id(app, "actual-size", m.actual_size, true, None::<&str>)?;
+    let theme_i = MenuItem::with_id(app, "toggle-theme", m.toggle_theme, true, None::<&str>)?;
     let view_menu = Submenu::with_items(
         app,
-        l("显示", "View"),
+        m.view,
         true,
         &[
             &find_i,
@@ -127,7 +251,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
 
     let window_menu = Submenu::with_items(
         app,
-        l("窗口", "Window"),
+        m.window,
         true,
         &[
             &PredefinedMenuItem::minimize(app, None)?,
@@ -136,19 +260,19 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         ],
     )?;
 
-    let site_i = MenuItem::with_id(app, "website", l("官方网站", "Website"), true, None::<&str>)?;
-    let mail_i = MenuItem::with_id(app, "feedback", l("反馈", "Feedback"), true, None::<&str>)?;
+    let site_i = MenuItem::with_id(app, "website", m.website, true, None::<&str>)?;
+    let mail_i = MenuItem::with_id(app, "feedback", m.feedback, true, None::<&str>)?;
     // 购买页面上写着"打开应用 → License → 输入激活码"，所以应用里必须真有一个能到那儿的入口。
     let license_i = MenuItem::with_id(
         app,
         "license",
-        l("许可与激活…", "License…"),
+        m.license,
         true,
         None::<&str>,
     )?;
     let help_menu = Submenu::with_items(
         app,
-        l("帮助", "Help"),
+        m.help,
         true,
         &[
             &license_i,
