@@ -400,6 +400,7 @@ fn main() {
             commands::redo,
             commands::reveal_in_finder,
             commands::license_status,
+            commands::machine_fingerprint,
             commands::store_receipt,
             build_menu,
             open_url,

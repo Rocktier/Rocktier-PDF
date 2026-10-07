@@ -237,15 +237,26 @@ export async function storeReceipt(signed: string): Promise<LicenseInfo> {
  * anyone mint their own codes. The frontend only carries the reply to Rust.
  */
 export async function activate(code: string): Promise<LicenseInfo> {
-  let payload: { receipt?: string; error?: string };
+  let payload: { receipt?: string; error?: string; devices?: { used: number | null; max: number; counted: boolean } };
   try {
+    /* 上报机器指纹 —— 服务端据此限制「一张码能激活几台设备」。
+       取不到时是空串，服务端不计数也不拦激活（见 api/devices.js）。
+       指纹只用于设备计数，不含任何硬件序列号原文。 */
+    let fingerprint = '';
+    try {
+      fingerprint = await invoke<string>('machine_fingerprint');
+    } catch {
+      // Rust 命令不可用（极旧版本）不该阻断激活。
+    }
     const res = await fetch('https://rocktier.com/api/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.trim() }),
+      body: JSON.stringify({ code: code.trim(), fingerprint, os: navigator.platform || '' }),
     });
     payload = (await res.json()) as { receipt?: string; error?: string };
     if (!res.ok || !payload.receipt) {
+      /* DEVICE_LIMIT 的下一步与其它错误完全不同：不是重试能解决的，
+         必须去网页解绑一台。把服务端那句话原样透出，别自己编。 */
       throw new Error(payload.error || `activation failed (${res.status})`);
     }
   } catch (e) {
