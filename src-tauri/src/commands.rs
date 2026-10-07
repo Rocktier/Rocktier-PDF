@@ -65,7 +65,7 @@ fn current_license() -> crate::license::Status {
     // 只认本单品与全家桶的回执：别人的回执即使验签通过，也不是本应用的授权。
     let receipt = crate::license::read_valid_receipt(dir, crate::license::PUBLIC_KEY_B64)
         .filter(crate::license::accepts);
-    crate::license::status_from(started, receipt.as_ref(), now)
+    crate::license::status_from(Some(started), receipt.as_ref(), now)
 }
 
 /// 写操作的统一闸门。
