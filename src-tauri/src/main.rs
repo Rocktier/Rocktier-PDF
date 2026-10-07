@@ -5,8 +5,16 @@ mod commands;
 mod compress;
 mod formclear;
 mod imagepass;
+/// 家族内唯一的产品标识，用作试用记录的副存储命名空间。
+///
+/// 必须与 `tauri.conf.json` 的 `bundle.identifier` 逐字一致 ——
+/// 副存储按它分文件，改了会导致老用户的试用记录读不到（等于白送 7 天）。
+/// 改动时两处必须同步。
+pub const APP_KEY: &str = "Rocktier.RocktierPDF";
+
 // 授权：试用状态与回执验签。写命令的拦截在 commands.rs，界面在 LicenseDialog。
 mod license;
+mod trial;
 // PDF → Markdown：结构推断内核（纯逻辑，单测覆盖），取字符在 pdf_to_markdown
 mod mdconv;
 mod pdf;
