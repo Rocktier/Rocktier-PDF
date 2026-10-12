@@ -227,7 +227,8 @@
 }
 
 .thumb-canvas.loading {
-  background: var(--bg-card);
+  /* 纸恒为白，深色档半透明 --bg-card 叠上去等于不可见。占位要用不透明表面。 */
+  background: #ececec;
   box-shadow: none;
 }
 
@@ -297,11 +298,13 @@
 }
 
 .page-placeholder {
-  background: var(--bg-card);
+  /* 纸恒为白(--page 硬编码 #fff)，深色档半透明令牌叠上去 = 1.00:1 完全不可见。
+     改用不透明深底 + 白字(4.74:1)，双主题通用。 */
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-tertiary);
+  color: #ffffff;
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -548,7 +551,8 @@
 }
 
 .statusbar .sep {
-  color: var(--border-hover);
+  /* --border-hover 是描边令牌(1.44~1.52:1)，不能当文字色用 */
+  color: var(--text-tertiary);
 }
 
 .statusbar .status-dot {
