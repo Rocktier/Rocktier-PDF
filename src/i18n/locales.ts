@@ -17,7 +17,9 @@ export const LOCALES = [
 
 export type LocaleCode = (typeof LOCALES)[number]['code'];
 
-/** 家族标准语言集（不含 Write 独有的 fr）—— 闸门按这个判定「是否达标」。 */
+/** 家族标准语言集（2026-10-13 起仅 en/zh）。 */
+
+/** @deprecated 保留导出以兼容旧 import；值等同 LOCALES.map(l => l.code)。 */
 export const FAMILY_LOCALES: readonly string[] = LOCALES.map((l) => l.code);
 
 /** 目标 locale 是否在家族标准集内。用于构建期过滤导入。 */
