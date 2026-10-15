@@ -345,11 +345,10 @@ export function Toolbar({
 
       <div className="toolbar-sep" />
 
-      {/* 家族标准 8 语言。原来是 en↔zh 二选一 toggle —— 6 门语言接入后
-          二选一没法用，改成 <select> 下拉。
-          用原生 select 而不是自定义弹层：8 个选项不需要搜索，
-          原生控件在 Windows/macOS 上行为一致，且键盘与读屏器免费获得。
-          endonym（语言自称）—— 用户看到「Deutsch」比「German (de)」
+      {/* 家族标准语言（2026-10-13 收敛为 en/zh 两门）：原生 select 下拉。
+          用原生控件而不是自定义弹层：选项少，原生控件在 Windows/macOS 上
+          行为一致，且键盘与读屏器免费获得。
+          endonym（语言自称）—— 用户看到「中文」比「Chinese (zh)」
           更容易找到自己的语言。 */}
       <select
         className="btn btn-icon lang-toggle"

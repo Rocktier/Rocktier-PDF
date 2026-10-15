@@ -103,7 +103,11 @@ const FLAT = flatten(TREE);
 console.error(`  en.ts 解析: ${Object.keys(FLAT).length} 条叶子键（含任意深度嵌套）`);
 
 /* ── 3. 生成译文树 ── */
-const LANGS = ["ja", "ko", "de", "es", "pt", "ar"];
+/* 2026-10-13 家族裁定：语言收敛为 en/zh 两门 —— 非中英语种均为未审校机翻基线
+   （family.json globalRules.$locales_2026_10_13）。生成器不再产出 6 门译文：
+   留着 LANGS 等于留一条复活路径，谁跑一次本脚本，删掉的字典文件全部回来。
+   scripts/i18n/<lang>.mjs 译文物保留作历史档案，不进构建。 */
+const LANGS = [];
 const targets = onlyLang ? [onlyLang] : LANGS;
 let missingTotal = 0;
 const written = [];
