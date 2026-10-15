@@ -45,6 +45,8 @@ export const zh: Strings = {
     subtitle: '一切都在你的设备上完成。不上传、无账号、不联网。',
     browse: '选择 PDF',
     hint: '或按 Ctrl/Cmd + O',
+    recent: '最近打开',
+    clear: '清空',
   },
 
   rail: {
@@ -283,14 +285,11 @@ export const zh: Strings = {
   },
 
   error: {
-    openFailed: '无法打开该 PDF。',
-    saveFailed: '无法保存 PDF。',
-    renderFailed: '无法渲染此页。',
-    noDoc: '当前没有打开的文档。',
-    pdfiumMissing: '未找到 Pdfium 引擎，请运行 `npm run fetch:pdfium`。',
-    passwordProtected: 'v0.1 不支持加密的 PDF。',
-    invalidRange: '页面范围无效。',
-    // ── 以下由 services/errorText.ts 映射 Rust 侧的英文错误原文 ──
+    /* 由 services/errorText.ts 把 Rust 侧的英文错误原文映射到这里。
+       2026-10-15 删掉了 7 个自 0.x 起就没有任何调用点的键（openFailed /
+       saveFailed / renderFailed / noDoc / pdfiumMissing / passwordProtected /
+       invalidRange）：自引入 errorText.ts 之后错误统一走「Rust 英文原文 →
+       localizeError」，它们从未接进那条链路，留着只会让后来者以为有映射。 */
     noPages: '该 PDF 没有任何页面。',
     noPagesSelected: '请先选中至少一页。',
     cannotDeleteAll: 'PDF 至少要保留一页。',

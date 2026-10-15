@@ -83,3 +83,45 @@ export function displayRectToPdf(
   }
   return { x: an * W, y: H - (bn + hn) * H, width: wn * W, height: hn * H };
 }
+
+/* ── 最近打开 ─────────────────────────────────────────────────────
+   Acrobat / PDF Expert / macOS Preview 都有这一栏，它解决的是最高频的一个
+   问题：「再打开上次那份」。只存路径不存内容 —— 路径本来就是用户自己的
+   本地信息，刷新成本是零。
+   放在 utils 而不是组件里：这是一段有分支和解析的存储逻辑，值得被独立测；
+   埋在 App.tsx 里就只能靠读代码确认。 */
+
+/** 家族命名空间前缀（rocktier.）由 family-check 的 storage-key-namespace 强制。 */
+const RECENT_KEY = 'rocktier.pdf.recent';
+export const RECENT_MAX = 5;
+
+/** 读最近列表。存量值可能是任何东西（手工编辑过、别的版本写的），逐项过滤。 */
+export function readRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const list: unknown = JSON.parse(raw);
+    if (!Array.isArray(list)) return [];
+    return list.filter((p): p is string => typeof p === 'string').slice(0, RECENT_MAX);
+  } catch {
+    /* 值损坏或 storage 不可用 —— 当作没有最近记录。打开文件不该因此失败。 */
+    return [];
+  }
+}
+
+/** 写最近列表。storage 不可用时静默降级：本次会话内列表照常工作，只是不持久。 */
+export function writeRecent(list: string[]): void {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    /* 同上 */
+  }
+}
+
+export function clearStoredRecent(): void {
+  try {
+    localStorage.removeItem(RECENT_KEY);
+  } catch {
+    /* 同上 */
+  }
+}

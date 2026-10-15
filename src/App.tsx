@@ -21,6 +21,7 @@ import { ThumbnailRail } from './components/ThumbnailRail';
 import { Toolbar } from './components/Toolbar';
 import { usePdf } from './hooks/usePdf';
 import { useI18n, useT } from './i18n';
+import { localizeError } from './services/errorText';
 import {
   buildMenu,
   copyText,
@@ -43,6 +44,7 @@ import {
   onLicenseExpired,
   type LicenseInfo,
   } from './services/engine';
+import { RECENT_MAX, clearStoredRecent, readRecent, writeRecent } from './utils';
 import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
 
 /** 三态：auto 跟随系统 → light → dark → auto（家族 §6.5 唯一状态机）。 */
@@ -72,6 +74,7 @@ export function App() {
   const pdf = usePdf();
 
   const [theme, setTheme] = useState<Theme>(() => readTheme());
+  const [recent, setRecent] = useState<string[]>(readRecent);
   const [zoom, setZoom] = useState(1);
   const [current, setCurrent] = useState(0);
   const [jump, setJump] = useState<{ index: number; token: number } | null>(null);
@@ -135,6 +138,20 @@ export function App() {
     window.setTimeout(() => setToast(null), 2600);
   }, []);
 
+  /** 记一笔最近打开。同一路径只留一条，最新的排最前。 */
+  const rememberRecent = useCallback((path: string) => {
+    setRecent((prev) => {
+      const next = [path, ...prev.filter((p) => p !== path)].slice(0, RECENT_MAX);
+      writeRecent(next);
+      return next;
+    });
+  }, []);
+
+  const clearRecent = useCallback(() => {
+    setRecent([]);
+    clearStoredRecent();
+  }, []);
+
   // 菜单打开与拖拽共用：报告结果、需要时弹密码框。定义在拖拽监听之前 ——
   // useEffect 的依赖数组在渲染期求值，晚于 const 声明会踩 TDZ。
   const runOpen = useCallback(
@@ -149,12 +166,20 @@ export function App() {
         // 换文档后旧选区指向的是别的页面，必须清干净。
         setRedactRects([]);
         setRedactMode(false);
+        rememberRecent(path);
         notify(t('toast.opened', { name: info.name }));
       } else if (error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT') {
         setPwPrompt({ path, incorrect: error === 'PASSWORD_INCORRECT' });
+      } else if (error) {
+        /* 打开失败必须落在**视线中心**。此前这里没有 else 分支，失败只进
+           usePdf 的 error state，最终显示在底部状态栏那行 11px 小字上 ——
+           而用户的视线在中央的 dropzone，于是体验就是「点了没反应」。
+           文案走 localizeError：底层真实原因（文件不存在 / 不是 PDF / 已损坏）
+           比一句笼统的「无法打开」有用得多，且不隐藏细节。 */
+        notify(localizeError(error, t), true);
       }
     },
-    [notify, pdf, t]
+    [notify, pdf, rememberRecent, t]
   );
 
   // 丢掉一份带未保存修改的内存文档是最贵的错误：任何替换先过守卫。
@@ -443,12 +468,18 @@ export function App() {
         setZoom(1);
         setRedactRects([]);
         setRedactMode(false);
+        rememberRecent(pwPrompt.path);
         notify(t('toast.opened', { name: info.name }));
         return true;
       }
+      /* 密码类错误留在对话框里重试；其他失败（文件被删、损坏）要报出来，
+         否则对话框一关就像什么都没发生。 */
+      if (error && error !== 'PASSWORD_REQUIRED' && error !== 'PASSWORD_INCORRECT') {
+        notify(localizeError(error, t), true);
+      }
       return !(error === 'PASSWORD_REQUIRED' || error === 'PASSWORD_INCORRECT');
     },
-    [notify, pdf, pwPrompt, t]
+    [notify, pdf, pwPrompt, rememberRecent, t]
   );
 
   const save = useCallback(async () => {
@@ -800,7 +831,13 @@ export function App() {
           </div>
         </div>
       ) : (
-        <DropZone onOpen={openFile} dragActive={dragActive} />
+        <DropZone
+          onOpen={openFile}
+          dragActive={dragActive}
+          recent={recent}
+          onOpenRecent={requestOpen}
+          onClearRecent={clearRecent}
+        />
       )}
 
       <StatusBar

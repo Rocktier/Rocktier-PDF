@@ -534,6 +534,75 @@
   font-family: var(--font-mono);
 }
 
+/* ── 最近打开（空态的第二条主路径）─────────────────────────────
+   宽度与 .dropzone 对齐，让两栏形成一条视觉中轴；列表项只用文件名（长路径
+   会撑爆这一栏，完整路径在 title 里）。 */
+.recent {
+  width: min(520px, 90%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  padding: 0 10px;
+}
+
+.recent-clear {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.recent-clear:hover {
+  color: var(--text-primary);
+}
+
+.recent ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recent li button {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.recent li button:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
 /* ── Status bar ───────────────────────────────────────────────── */
 .statusbar {
   display: flex;
