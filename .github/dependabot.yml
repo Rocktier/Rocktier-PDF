@@ -1,12 +1,17 @@
 version: 2
 updates:
+  # 2026-10-16 决议（task_plan P0''，用户拍板）：版本更新暂停 —— 10 个 PR 全为
+  # 09-20 开启且多为大版本跳跃（vite 5→8 / typescript 5.9→7 / ed25519-dalek
+  # 2→3 / lopdf 0.36→0.45），发版前不做大跳跃；发版后开「依赖升级专项」逐笔
+  # 验证后恢复。open-pull-requests-limit: 0 只停版本更新，**安全更新有独立
+  # 额度不受影响**，安全告警照常出 PR。
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
