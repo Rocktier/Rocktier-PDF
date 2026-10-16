@@ -399,7 +399,7 @@ fn initial_file(state: tauri::State<InitialFile>) -> Option<String> {
 }
 
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::new())
         .setup(|app| {
