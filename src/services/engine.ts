@@ -122,6 +122,16 @@ export function onMenuAction(handler: (id: string) => void): Promise<() => void>
   return listen<string>('menu-action', (event) => handler(event.payload));
 }
 
+/** Path the OS asked us to open at launch (file association); null when none. */
+export function initialFile(): Promise<string | null> {
+  return invoke<string | null>('initial_file');
+}
+
+/** Subscribes to "the OS wants this file opened while we are running" (macOS RunEvent::Opened). */
+export function onOpenFile(handler: (path: string) => void): Promise<() => void> {
+  return listen<string>('open-file', (event) => handler(event.payload));
+}
+
 /* ── Undo / redo ────────────────────────────────────────────────── */
 
 /** Step the document history back one mutation. */

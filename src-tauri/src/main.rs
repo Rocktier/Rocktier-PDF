@@ -23,7 +23,10 @@ mod pdf_to_md;
 mod security;
 mod state;
 
+use std::sync::Mutex;
+
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::Manager as _;
 use tauri::{AppHandle, Emitter};
 
 use state::AppState;
@@ -356,6 +359,45 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 启动时要打开的 PDF 路径，由操作系统传入：
+/// - Windows / Linux：文件关联注册的打开命令是 `"app.exe" "%1"`，路径在 argv 里；
+/// - macOS / iOS：走 `RunEvent::Opened` 事件（见 `main()`）。冷启动时该事件可能早于
+///   前端挂载，所以先缓冲在这里，前端挂载后再用 `initial_file` 拉取。
+struct InitialFile(Mutex<Option<String>>);
+
+/// 启动期到达的文档队列（tao#1235：冷启动时 `application:openURLs:` 早于
+/// setup/托管状态，`try_state` 拿不到任何东西，必须在进程级静态里排队，
+/// setup 完成后再搬进 `InitialFile`。Chromium 的 `_startupComplete` 同款）。
+static PENDING_DOCS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// 与 `tauri.conf.json` 的 `bundle.fileAssociations` 保持一致：只关联 pdf。
+fn is_pdf_path(path: &std::path::Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    match path.extension().and_then(|e| e.to_str()) {
+        Some(ext) => ext.eq_ignore_ascii_case("pdf"),
+        None => false,
+    }
+}
+
+/// 取命令行里第一个真实存在的 PDF。更新器开关等其它参数会被 is_pdf_path 自然过滤掉。
+fn file_from_args() -> Option<String> {
+    std::env::args_os()
+        .skip(1)
+        .map(std::path::PathBuf::from)
+        .find(|p| is_pdf_path(p))
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// 前端挂载后询问「启动时是否带了文档」。只 clone 不 take：
+/// effect 重跑（或未来引入 StrictMode）时 take 会让第二次调用拿到 None，
+/// 启动文件就被丢掉了。
+#[tauri::command]
+fn initial_file(state: tauri::State<InitialFile>) -> Option<String> {
+    state.0.lock().ok().and_then(|slot| slot.clone())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -363,11 +405,26 @@ fn main() {
         .setup(|app| {
             // 授权状态的落盘目录。取不到就留空，`current_status()` 会按"不拦截"处理
             // —— 宁可少拦一次，也不能因为一个目录取不到把用户锁在外面。
-            use tauri::Manager as _;
             if let Ok(dir) = app.path().app_data_dir() {
                 commands::init_license_dir(dir);
             }
             commands::init_app_handle(app.handle().clone());
+            // 双击关联文件启动时（Windows/Linux）路径在 argv 里，先缓冲起来。
+            app.manage(InitialFile(Mutex::new(file_from_args())));
+            // tao#1235：把冷启动队列里的文档搬进托管状态（setup 晚于
+            // application:openURLs:，此刻托管状态与窗口才真正可用）。
+            let queued: Vec<String> = PENDING_DOCS
+                .lock()
+                .expect("PENDING_DOCS poisoned")
+                .drain(..)
+                .collect();
+            if let Some(first) = queued.first() {
+                if let Some(state) = app.try_state::<InitialFile>() {
+                    if let Ok(mut slot) = state.0.lock() {
+                        *slot = Some(first.clone());
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -403,6 +460,7 @@ fn main() {
             commands::report_machine_fingerprint,
             commands::store_receipt,
             build_menu,
+            initial_file,
             open_url,
         
             commands::compress_document,])
@@ -411,6 +469,53 @@ fn main() {
             // guards and toasts stay in one place.
             let _ = app.emit("menu-action", event.id().0.as_str());
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Rocktier PDF Editor");
+        // 冷启动竞态补发：Opened 事件可能落在「前端查询 initial_file 之后、
+        // 监听器挂载之前」的空窗里。页面加载完成时若仍有待开文档，再补发一次 ——
+        // 前端对同一文档有去重，不会弹两次。
+        .on_page_load(|window, payload| {
+            if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                return;
+            }
+            if let Some(state) = window.app_handle().try_state::<InitialFile>() {
+                if let Ok(slot) = state.0.lock() {
+                    if let Some(path) = slot.as_ref() {
+                        let _ = window.emit("open-file", path.clone());
+                    }
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building Rocktier PDF Editor");
+
+    app.run(|_app_handle, _event| {
+        // macOS / iOS 的文件关联不是命令行参数，而是一个事件（Windows 见 file_from_args）。
+        // 两种时序都要兜住：冷启动时事件可能早于前端挂载 —— 所以写进 InitialFile，
+        // 前端挂载后经 initial_file 拉取；也可能晚于挂载 —— 所以同时 emit 出去。
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            for url in urls {
+                let Ok(path) = url.to_file_path() else { continue };
+                let Some(path) = path.to_str() else { continue };
+                if !is_pdf_path(std::path::Path::new(path)) {
+                    continue;
+                }
+                // tao#1235：冷启动时该事件在 setup/托管状态存在之前直达（urls 空、
+                // try_state 为 None 都可能发生），所以先入进程级队列，setup 再搬运。
+                // 热启动先排空队列：队列只在 setup 里 drain 一次，不排则每打开
+                // 一个文件就多残留一条（缓慢内存泄漏）。
+                if let Ok(mut q) = PENDING_DOCS.lock() {
+                    q.clear();
+                    q.push(path.to_string());
+                }
+                // 热启动（应用已运行）：托管状态与前端监听都在，立即送达。
+                if let Some(state) = _app_handle.try_state::<InitialFile>() {
+                    if let Ok(mut slot) = state.0.lock() {
+                        *slot = Some(path.to_string());
+                    }
+                }
+                let _ = _app_handle.emit("open-file", path);
+                break;
+            }
+        }
+    });
 }

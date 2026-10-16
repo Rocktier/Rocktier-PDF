@@ -20,6 +20,15 @@
       "icons/icon.png",
       "icons/icon.icns"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["pdf"],
+        "name": "PDF Document",
+        "description": "PDF Document",
+        "role": "Editor",
+        "mimeType": "application/pdf"
+      }
+    ],
     "macOS": {
       "entitlements": "Entitlements.plist"
     },

@@ -28,7 +28,9 @@ import {
   exportPageImages,
   fileStem,
   imagesToPdf,
+  initialFile,
   onMenuAction,
+  onOpenFile,
   openUrl,
   pageText,
   pickDirectory,
@@ -216,6 +218,40 @@ export function App() {
         else unlisten = fn;
       });
 
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [requestOpen]);
+
+  /* ── Files the OS asked us to open (double-click / "Open With") ─ */
+  // Cold start: the path arrives via argv (Windows/Linux) or a buffered
+  // RunEvent::Opened (macOS) — ask Rust once after mount. Warm start (macOS,
+  // app already running): the matching RunEvent becomes "open-file". The
+  // page-load re-emit can deliver the same path a second time; the
+  // current-document check swallows that echo.
+  const docPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    docPathRef.current = pdf.doc?.path ?? null;
+  }, [pdf.doc?.path]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void initialFile()
+      .then((path) => {
+        if (!disposed && path) requestOpen(path);
+      })
+      .catch(() => {
+        /* browser dev builds have no backend */
+      });
+    void onOpenFile((path) => {
+      if (disposed || path === docPathRef.current) return;
+      requestOpen(path);
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
     return () => {
       disposed = true;
       unlisten?.();
