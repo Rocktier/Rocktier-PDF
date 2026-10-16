@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use pdfium_render::prelude::*;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::pdf::{
     degrees_of, doc_info, init_pdfium, parse_ranges, render_page as render_page_impl,
@@ -645,16 +645,27 @@ pub async fn split_document(
 /* ── Text & search ───────────────────────────────────────────────── */
 
 /// Find every occurrence of `query` across all pages.
+///
+/// Runs on the blocking pool: a search over a 900-page book is seconds of
+/// CPU-bound Pdfium work, and running that on the async runtime starves every
+/// other command — the window goes unresponsive until the scan finishes.
 #[tauri::command]
 pub async fn search_document(
-    state: State<'_, AppState>,
+    app: AppHandle,
     query: String,
     match_case: bool,
     whole_word: bool,
 ) -> CmdResult<Vec<SearchHit>> {
-    let guard = state.doc.lock().map_err(|e| e.to_string())?;
-    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
-    crate::pdf::search_document(&doc.document, &query, match_case, whole_word)
+    tauri::async_runtime::spawn_blocking(move || {
+        // A `State` borrow cannot cross into this `'static` task, so the state
+        // is fetched through the handle instead.
+        let state = app.state::<AppState>();
+        let guard = state.doc.lock().map_err(|e| e.to_string())?;
+        let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+        crate::pdf::search_document(&doc.document, &query, match_case, whole_word)
+    })
+    .await
+    .map_err(|e| format!("search task failed: {e}"))?
 }
 
 /// Concatenated plain text of the given pages, for "copy page text".
