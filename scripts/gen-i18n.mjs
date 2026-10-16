@@ -27,7 +27,7 @@
 
    用法：
      node scripts/gen-i18n.mjs                # 生成全部语言
-     node scripts/gen-i18n.mjs --lang ja      # 只生成日语
+     node scripts/gen-i18n.mjs --lang <code>  # 只生成一门；--lang 仅接受 LANGS 里的语言（2026-10-13 收敛后为空）
      ROCKTIER_ROOT=/path/to/Rocktier node …   # 家族根不在默认位置时
 */
 
@@ -108,6 +108,16 @@ console.error(`  en.ts 解析: ${Object.keys(FLAT).length} 条叶子键（含任
    留着 LANGS 等于留一条复活路径，谁跑一次本脚本，删掉的字典文件全部回来。
    scripts/i18n/<lang>.mjs 译文物保留作历史档案，不进构建。 */
 const LANGS = [];
+
+/* --lang 只接受 LANGS 里的语言 —— LANGS 是唯一真源（2026-10-13 收敛裁定后为空）。
+   en/zh 由基线数据恒产，不需要指定；基线外语言要重建必须先入 LANGS 并通过审校，
+   不能用 --lang 绕过。没有这道守卫时，`--lang ja` 会去读 scripts/i18n/ja.mjs
+   归档并罗列「缺 N 条译文、补齐后重跑」—— 那段话等于邀请把已删的机翻基线请回来。 */
+if (onlyLang && !LANGS.includes(onlyLang)) {
+  console.error(`  ❌ --lang "${onlyLang}"：不在 LANGS（当前为空 —— 2026-10-13 语言收敛裁定）。`);
+  console.error(`     en/zh 无需指定；基线外语言须先入 LANGS 并通过审校。`);
+  process.exit(2);
+}
 const targets = onlyLang ? [onlyLang] : LANGS;
 let missingTotal = 0;
 const written = [];
