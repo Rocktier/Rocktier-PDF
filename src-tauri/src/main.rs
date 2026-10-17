@@ -195,7 +195,11 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
                 }),
             )?,
             &PredefinedMenuItem::separator(app)?,
+            // Windows 上 muda 的 hide_others 落进 `_ => {}` 点了无反应、hide 是
+            // SW_HIDE 窗口消失召不回（findings D-42）——仅 macOS 显示这两项。
+            #[cfg(target_os = "macos")]
             &PredefinedMenuItem::hide(app, None)?,
+            #[cfg(target_os = "macos")]
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::quit(app, None)?,
@@ -267,7 +271,12 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         &[
             &PredefinedMenuItem::minimize(app, None)?,
             &PredefinedMenuItem::separator(app)?,
+            // macOS 原生全屏有效；Windows 上 muda 的 fullscreen 落进 `_ => {}` 点了
+            // 无反应，改用自定义 win-fullscreen 项，由 on_menu_event 调 set_fullscreen。
+            #[cfg(target_os = "macos")]
             &PredefinedMenuItem::fullscreen(app, None)?,
+            #[cfg(target_os = "windows")]
+            &MenuItem::with_id(app, "win-fullscreen", "Toggle Full Screen", true, None::<&str>)?,
         ],
     )?;
 
@@ -465,6 +474,13 @@ fn main() {
         
             commands::compress_document,])
         .on_menu_event(|app, event| {
+            // Windows 真全屏（替代 muda 在 Win 上无效的 PredefinedMenuItem::fullscreen）
+            if event.id().0.as_str() == "win-fullscreen" {
+                if let Some(win) = app.get_webview_windows().values().next().cloned() {
+                    let _ = win.set_fullscreen(!win.is_fullscreen().unwrap_or(false));
+                }
+                return;
+            }
             // Menu clicks become a frontend action chain, so unsaved-changes
             // guards and toasts stay in one place.
             let _ = app.emit("menu-action", event.id().0.as_str());
