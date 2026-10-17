@@ -271,11 +271,10 @@ export async function activate(code: string): Promise<LicenseInfo> {
     }
   } catch (e) {
     // Offline is the common case here — say so instead of showing a fetch error.
-    throw new Error(
-      e instanceof Error && e.message && !e.message.includes('fetch')
-        ? e.message
-        : 'offline'
-    );
+    // WKWebView 把被拦/断网的 fetch 抛成 "Load failed"（不含 "fetch" 字样）：
+    // 只认 "fetch" 会把它当成服务端错误落进 invalid，误导向「码不对」。
+    const raw = e instanceof Error && e.message ? e.message : '';
+    throw new Error(raw && !/fetch|load failed|network/i.test(raw) ? raw : 'offline');
   }
   return storeReceipt(payload.receipt);
 }

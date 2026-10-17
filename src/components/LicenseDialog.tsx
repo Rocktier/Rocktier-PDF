@@ -40,12 +40,13 @@ export function LicenseDialog({ info, onRefresh, onClose }: LicenseDialogProps) 
       onRefresh();
     } catch (e) {
       // 把失败原因照实说清：区分"码不对"和"没连上网"，用户才知道下一步做什么。
-      /* 三种失败要分开说，用户的下一步动作不同：没连上网（重试即可）、码属于别的
-         应用（要买对单品或全家桶）、码不对（检查有没有抄错）。 */
+      /* 四种失败要分开说，用户的下一步动作不同：没连上网（重试即可）、码属于别的
+         应用（要买对单品或全家桶）、设备数到顶（去网页解绑一台）、码不对（检查有没有抄错）。 */
       const detail = e instanceof Error ? e.message : String(e);
       if (detail === 'offline') setError(t('license.offline'));
       else if (detail.includes('WRONG_PRODUCT')) setError(t('license.wrongProduct'));
       else if (detail.includes('REFUNDED')) setError(t('license.refunded'));
+      else if (detail.includes('DEVICE_LIMIT')) setError(t('license.deviceLimit'));
       else setError(t('license.invalid'));
     } finally {
       setBusy(false);
