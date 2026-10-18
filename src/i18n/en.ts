@@ -236,6 +236,17 @@ export const en = {
     privacyNote:
       'Activating sends the code to rocktier.com once and stores the signed reply locally. Nothing else is sent.',
   },
+  update: {
+    check: 'Check for updates',
+    checking: 'Checking…',
+    upToDate: "You're up to date",
+    available: 'Version {v} is available',
+    failed: "Couldn't check for updates",
+    lastChecked: 'Last checked {date}',
+    never: 'Never',
+    download: 'Get {v}',
+    privacyNote: 'Only checks when you click — the app never checks on its own',
+  },
   markdown: {
     title: 'Export as Markdown',
     converting: 'Reading text and inferring structure…',

@@ -230,6 +230,17 @@ export const zh: Strings = {
     privacyNote:
       '激活会把激活码发送到 rocktier.com 一次，并把签名回执保存在本机。除此之外不传输任何内容。',
   },
+  update: {
+    check: '检查更新',
+    checking: '正在检查…',
+    upToDate: '已是最新版本',
+    available: '有新版本 {v}',
+    failed: '检查失败，请稍后再试',
+    lastChecked: '上次检查：{date}',
+    never: '从未检查',
+    download: '获取 {v}',
+    privacyNote: '点击才会联网，应用不会自动检查',
+  },
   markdown: {
     title: '导出为 Markdown',
     converting: '正在读取文字并推断结构…',

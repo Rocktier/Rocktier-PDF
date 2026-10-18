@@ -70,6 +70,7 @@ struct MenuStrings {
     feedback: &'static str,
     about: &'static str,
     license: &'static str,
+    check_updates: &'static str,
 }
 
 impl MenuStrings {
@@ -84,7 +85,7 @@ impl MenuStrings {
                 help: "帮助", find: "查找", actual_size: "实际大小",
                 toggle_theme: "切换日夜模式", website: "官方网站",
                 feedback: "反馈", about: "关于 Rocktier PDF Editor",
-                license: "许可与激活…",
+                license: "许可与激活…", check_updates: "检查更新…",
             },
             "ja" => Self {
                 open: "開く…", save: "保存", save_as: "名前を付けて保存…",
@@ -93,7 +94,7 @@ impl MenuStrings {
                 help: "ヘルプ", find: "検索", actual_size: "原寸",
                 toggle_theme: "テーマを切り替え", website: "公式サイト",
                 feedback: "フィードバック", about: "Rocktier PDF Editor について",
-                license: "ライセンス…",
+                license: "ライセンス…", check_updates: "アップデートを確認…",
             },
             "ko" => Self {
                 open: "열기…", save: "저장", save_as: "다른 이름으로 저장…",
@@ -102,7 +103,7 @@ impl MenuStrings {
                 help: "도움말", find: "검색", actual_size: "실제 크기",
                 toggle_theme: "테마 전환", website: "공식 웹사이트",
                 feedback: "피드백", about: "Rocktier PDF Editor 정보",
-                license: "라이선스…",
+                license: "라이선스…", check_updates: "업데이트 확인…",
             },
             "de" => Self {
                 open: "Öffnen…", save: "Speichern", save_as: "Speichern unter…",
@@ -111,7 +112,7 @@ impl MenuStrings {
                 help: "Hilfe", find: "Suchen", actual_size: "Originalgröße",
                 toggle_theme: "Design wechseln", website: "Website",
                 feedback: "Feedback", about: "Über Rocktier PDF Editor",
-                license: "Lizenz…",
+                license: "Lizenz…", check_updates: "Nach Updates suchen…",
             },
             "es" => Self {
                 open: "Abrir…", save: "Guardar", save_as: "Guardar como…",
@@ -120,7 +121,7 @@ impl MenuStrings {
                 help: "Ayuda", find: "Buscar", actual_size: "Tamaño real",
                 toggle_theme: "Cambiar tema", website: "Sitio web",
                 feedback: "Comentarios", about: "Acerca de Rocktier PDF Editor",
-                license: "Licencia…",
+                license: "Licencia…", check_updates: "Buscar actualizaciones…",
             },
             "pt" => Self {
                 open: "Abrir…", save: "Salvar", save_as: "Salvar como…",
@@ -129,7 +130,7 @@ impl MenuStrings {
                 help: "Ajuda", find: "Buscar", actual_size: "Tamanho real",
                 toggle_theme: "Alternar tema", website: "Site",
                 feedback: "Comentários", about: "Sobre o Rocktier PDF Editor",
-                license: "Licença…",
+                license: "Licença…", check_updates: "Verificar atualizações…",
             },
             "ar" => Self {
                 open: "فتح…", save: "احفظ", save_as: "حفظ باسم…",
@@ -138,7 +139,7 @@ impl MenuStrings {
                 help: "مساعدة", find: "ابحث", actual_size: "الحجم الحقيقي",
                 toggle_theme: "تبديل المظهر", website: "الموقع",
                 feedback: "ملاحظات", about: "حول Rocktier PDF Editor",
-                license: "الترخيص…",
+                license: "الترخيص…", check_updates: "التحقق من التحديثات…",
             },
             // English is both the default and the fallback: the family convention
             // is a fixed English default (family.json `defaultLanguage: "en"`),
@@ -150,7 +151,7 @@ impl MenuStrings {
                 help: "Help", find: "Find", actual_size: "Actual Size",
                 toggle_theme: "Toggle Theme", website: "Website",
                 feedback: "Feedback", about: "About Rocktier PDF Editor",
-                license: "License…",
+                license: "License…", check_updates: "Check for Updates…",
             },
         }
     }
@@ -283,6 +284,8 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
     let site_i = MenuItem::with_id(app, "website", m.website, true, None::<&str>)?;
     let mail_i = MenuItem::with_id(app, "feedback", m.feedback, true, None::<&str>)?;
     // 购买页面上写着"打开应用 → License → 输入激活码"，所以应用里必须真有一个能到那儿的入口。
+    // 检查更新：只 emit "check-updates"，联网由前端 services/updates.ts 做。
+    let update_i = MenuItem::with_id(app, "check-updates", m.check_updates, true, None::<&str>)?;
     let license_i = MenuItem::with_id(
         app,
         "license",
@@ -295,6 +298,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         m.help,
         true,
         &[
+            &update_i,
             &license_i,
             &PredefinedMenuItem::separator(app)?,
             &site_i,
