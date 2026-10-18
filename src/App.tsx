@@ -44,6 +44,7 @@ import {
     compressDocument,
   licenseStatus,
   onLicenseExpired,
+  revalidateLicence,
   type LicenseInfo,
   } from './services/engine';
 import { RECENT_MAX, clearStoredRecent, readRecent, writeRecent } from './utils';
@@ -102,6 +103,10 @@ export function App() {
       setLastCheckedAt(result.checkedAt);
       try { localStorage.setItem(UPDATE_CHECKED_KEY, String(result.checkedAt)); } catch { /* 隐私模式下忽略 */ }
       setUpdateState(result.hasUpdate ? 'available' : 'uptodate');
+      /* 顺带吊销复检：同一次点击、同一承诺（只在点击时联网）。revoked → 清回执，
+         授权状态回到未激活；下一次写操作由既有 LICENSE_EXPIRED 流程接管。 */
+      const verdict = await revalidateLicence();
+      if (verdict === 'revoked') refreshLicense();
     } catch {
       setUpdateState('failed');
     } finally {

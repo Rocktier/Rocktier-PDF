@@ -472,6 +472,7 @@ fn main() {
             commands::license_status,
             commands::report_machine_fingerprint,
             commands::store_receipt,
+            commands::clear_receipt,
             build_menu,
             initial_file,
             open_url,
