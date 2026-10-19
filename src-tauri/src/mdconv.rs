@@ -211,6 +211,7 @@ pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
 // ────────────────────────────────────────────────────────────────────
 
 /// 一个「行内段」：同一基线簇被列间大间隙切开后的连续字形串。
+#[derive(Clone)]
 struct Seg<'a> {
     glyphs: Vec<&'a Glyph>,
     x0: f32,
@@ -223,7 +224,7 @@ struct Seg<'a> {
 
 /// 把一个基线簇按列间大间隙切成段。间隙阈值与 `Line.gaps` 同源（1.5×字宽）：
 /// 正常词距（≈0.25×字号）远到不了这条线，真正的栏间空白才会切开。
-fn segment_row(cluster: &[&Glyph]) -> Vec<Seg> {
+fn segment_row(cluster: &[&Glyph]) -> Vec<Seg<'_>> {
     if cluster.is_empty() {
         return Vec::new();
     }
@@ -248,7 +249,7 @@ fn segment_row(cluster: &[&Glyph]) -> Vec<Seg> {
     out
 }
 
-fn close_seg(cluster: &[&Glyph]) -> Seg {
+fn close_seg(cluster: &[&Glyph]) -> Seg<'_> {
     let ink = cluster
         .iter()
         .map(|g| g.text.chars().filter(|c| !c.is_whitespace()).count())
