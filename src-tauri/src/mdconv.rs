@@ -1344,8 +1344,21 @@ mod tests {
 
         let lines = glyphs_to_lines(&g);
         let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
-        assert_eq!(texts.len(), 7, "6 行正文 + 1 行页码: {texts:?}");
-        assert!(texts[0].starts_with("Single column body line number 1"), "{texts:?}");
+        // 判定不变量：**不切栏**。页码与首行同基线，仍会被拼进同一行 —— 这是
+        // 既有行为（跨页重复的页码由 drop_running_furniture 剔除；单页 unit
+        // test 没有跨页上下文）。要断言的是「没有发生列序重排」。
+        assert_eq!(texts.len(), 6, "6 行（页码拼进首行）: {texts:?}");
+        assert!(
+            texts[0].starts_with("Single column body line number 1"),
+            "首行不得被列序重排: {texts:?}"
+        );
+        for (i, t) in texts.iter().skip(1).enumerate() {
+            assert_eq!(
+                t,
+                &format!("Single column body line number {}", i + 2),
+                "正文行序不得被重排: {texts:?}"
+            );
+        }
     }
 
     #[test]
