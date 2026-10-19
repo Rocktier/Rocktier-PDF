@@ -136,6 +136,10 @@ pub struct Options {
 /// 2. **同一基线内按水平间距插入空格** —— PDF 里字间距是排版信息，
 ///    直接拼接会把英文单词粘成 `Helloworld`。间距阈值取字宽的一部分，
 ///    避免把字母间距较大的字体误插空格。
+// 生产链路（pdf_to_md）走 glyphs_to_lines_ex；本包装只剩测试在调用，
+// 而 cargo check / clippy 不编译 cfg(test)，会被 -D dead-code 判死，
+#[cfg_attr(not(test), allow(dead_code))]
+// 故仅对非 test 构建豁免（test 构建下若真有未使用仍会暴露）。
 pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
     glyphs_to_lines_ex(glyphs).0
 }
