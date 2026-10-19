@@ -327,7 +327,7 @@ fn find_two_col_gutter<'a>(segs: &[Seg<'a>]) -> Option<(f32, f32)> {
     best
 }
 
-fn median_ink<'g, 'b, I: Iterator<Item = &'b Seg<'g>>>(segs: I) -> usize {
+fn median_ink<'g>(segs: impl Iterator<Item = &'g Seg<'g>>) -> usize {
     let mut v: Vec<usize> = segs.map(|s| s.ink).collect();
     v.sort_unstable();
     v.get(v.len() / 2).copied().unwrap_or(0)
