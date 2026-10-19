@@ -15,6 +15,9 @@
 //! - **缩进 → 层级**：列表/引用按 x 起点缩进分级。
 //! - **表格 v1 降级**：检测到多栏对齐时输出为纯文本行 + TODO 注释，
 //!   不猜表格结构（猜错比不猜更糟）。见`table_like_regions`。
+//! - **双栏 → 列序**：先按「列间大间隙」把每行切成段，再找一条**没有任何段
+//!   跨越**的竖直空白带；两侧都有足量成段正文时，先左列（上→下）后右列。
+//!   任何一段跨越候选带 → 不切（保守回退到旧行为）。见`find_two_col_gutter`。
 
 use std::collections::BTreeMap;
 
@@ -165,6 +168,33 @@ pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
     // 两簇的 x 会交错（如 "Hello" 与 "World" 交错）。
     // 故先合并「基线接近且水平区间重叠」的相邻簇，再生成Line。
     let merged = merge_interleaved(lines);
+
+    // 行 → 段（在列间大间隙处切开），再做双栏判定。
+    // 判定不过 → 逐簇 finish_line（旧行为：左右两栏同一基线拼成一行）。
+    let mut segs: Vec<Seg> = Vec::new();
+    for cl in &merged {
+        for seg in segment_row(cl) {
+            segs.push(seg);
+        }
+    }
+    if let Some((gx0, gx1)) = find_two_col_gutter(&segs) {
+        let mut left: Vec<Seg> = segs.iter().filter(|s| s.x1 <= gx0).cloned().collect();
+        let mut right: Vec<Seg> = segs.iter().filter(|s| s.x0 >= gx1).cloned().collect();
+        let by_reading = |a: &Seg, b: &Seg| {
+            b.baseline
+                .partial_cmp(&a.baseline)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.x0.partial_cmp(&b.x0).unwrap_or(std::cmp::Ordering::Equal))
+        };
+        left.sort_by(by_reading);
+        right.sort_by(by_reading);
+        return left
+            .into_iter()
+            .chain(right)
+            .map(|s| finish_line(&s.glyphs))
+            .collect();
+    }
+
     merged
         .iter()
         .filter_map(|cluster| {
@@ -174,6 +204,132 @@ pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
             Some(finish_line(cluster))
         })
         .collect()
+}
+
+// ────────────────────────────────────────────────────────────────────
+// 双栏检测（R4 多栏，v1 只处理左右两栏）
+// ────────────────────────────────────────────────────────────────────
+
+/// 一个「行内段」：同一基线簇被列间大间隙切开后的连续字形串。
+struct Seg<'a> {
+    glyphs: Vec<&'a Glyph>,
+    x0: f32,
+    x1: f32,
+    /// 该段的基线（同簇共享，取最左字形的 y0 —— 与 finish_line 一致）
+    baseline: f32,
+    /// 非空白字符数 —— 区分「成段正文」（长）与「表格单元格」（短）
+    ink: usize,
+}
+
+/// 把一个基线簇按列间大间隙切成段。间隙阈值与 `Line.gaps` 同源（1.5×字宽）：
+/// 正常词距（≈0.25×字号）远到不了这条线，真正的栏间空白才会切开。
+fn segment_row(cluster: &[&Glyph]) -> Vec<Seg> {
+    if cluster.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<&Glyph> = cluster.to_vec();
+    sorted.sort_by(|a, b| a.x0.partial_cmp(&b.x0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut out: Vec<Seg> = Vec::new();
+    let mut cur: Vec<&Glyph> = vec![sorted[0]];
+    let mut prev = sorted[0];
+    for g in &sorted[1..] {
+        let gap = g.x0 - prev.x1;
+        let ref_w = (prev.x1 - prev.x0).max(g.x1 - g.x0).max(1.0);
+        if gap > ref_w * 1.5 {
+            out.push(close_seg(&cur));
+            cur = vec![g];
+        } else {
+            cur.push(g);
+        }
+        prev = g;
+    }
+    out.push(close_seg(&cur));
+    out
+}
+
+fn close_seg(cluster: &[&Glyph]) -> Seg {
+    let ink = cluster
+        .iter()
+        .map(|g| g.text.chars().filter(|c| !c.is_whitespace()).count())
+        .sum();
+    Seg {
+        x0: cluster.iter().map(|g| g.x0).fold(f32::MAX, f32::min),
+        x1: cluster.iter().map(|g| g.x1).fold(f32::MIN, f32::max),
+        baseline: cluster[0].y0,
+        ink,
+        glyphs: cluster.to_vec(),
+    }
+}
+
+/// 找「双栏分隔带」：一条没有任何段跨越的竖直空白带，且两侧都有足够的成段正文。
+///
+/// ## 判据与阈值
+///
+/// - 带宽 ≥ 8pt：正常词距在 10pt 字号下 ≈2.5pt，栏间空白通常 ≥18pt —— 8pt 卡在
+///   两者之间，配合下方的「两侧质量」门槛兜底。
+/// - 两侧段数各 ≥ max(4, 总段数 25%)：单栏文档右缘之外偶尔落一个页码，数量
+///   门槛让它够不成「右栏」。
+/// - 两侧段的中位 ink ≥ 12 字符：**表格与双栏正文在几何上同构**（两列单元格
+///   与两栏正文都是「左右两串 + 中间空带」），唯一可用的几何差异是单元格短、
+///   正文行长。中位长度是最便宜的判别器——不完美，但 v1 够用，且表格页
+///   本来就有 TablesNotConverted 告警兜底。
+/// - **零跨越**是硬条件：任何横贯全宽的元素（标题、图）落在候选带上，这条带
+///   就从「空带并集」里消失 —— 该页自动回退到旧行为，宁可漏切不可切错。
+fn find_two_col_gutter(segs: &[Seg]) -> Option<(f32, f32)> {
+    const MIN_SEGMENTS_PER_SIDE: usize = 4;
+    const MIN_SIDE_MASS_FRAC: f32 = 0.25;
+    const MIN_GUTTER_WIDTH: f32 = 8.0;
+    const MIN_MEDIAN_INK: usize = 12;
+
+    if segs.len() < 8 {
+        return None;
+    }
+
+    // 区间并集 → 空带 = 相邻合并区间之间的缝
+    let mut ivs: Vec<(f32, f32)> = segs.iter().map(|s| (s.x0, s.x1)).collect();
+    ivs.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    let mut merged: Vec<(f32, f32)> = Vec::new();
+    for (a, b) in ivs {
+        match merged.last_mut() {
+            Some(last) if a <= last.1 => last.1 = last.1.max(b),
+            _ => merged.push((a, b)),
+        }
+    }
+
+    let need = (((segs.len() as f32) * MIN_SIDE_MASS_FRAC).ceil() as usize).max(MIN_SEGMENTS_PER_SIDE);
+    let mut best: Option<(f32, f32)> = None;
+    for w in merged.windows(2) {
+        let (s0, s1) = (w[0].1, w[1].0);
+        if s1 - s0 < MIN_GUTTER_WIDTH {
+            continue;
+        }
+        let left = segs.iter().filter(|s| s.x1 <= s0).count();
+        let right = segs.iter().filter(|s| s.x0 >= s1).count();
+        if left < need || right < need {
+            continue;
+        }
+        let ink_left = median_ink(segs.iter().filter(|s| s.x1 <= s0));
+        let ink_right = median_ink(segs.iter().filter(|s| s.x0 >= s1));
+        if ink_left < MIN_MEDIAN_INK || ink_right < MIN_MEDIAN_INK {
+            continue;
+        }
+        match best {
+            Some((b0, b1)) if (b1 - b0) >= (s1 - s0) => {}
+            _ => best = Some((s0, s1)),
+        }
+    }
+    best
+}
+
+fn median_ink<'a, I: Iterator<Item = &'a Seg>>(segs: I) -> usize {
+    let mut v: Vec<usize> = segs.map(|s| s.ink).collect();
+    v.sort_unstable();
+    v.get(v.len() / 2).copied().unwrap_or(0)
 }
 
 /// 合并基线接近、但 x 区间交错的相邻簇。
@@ -1100,6 +1256,95 @@ mod tests {
         };
         assert_eq!(lvl("Facilities Inspection Report"), Some(1), "最大字号应是 h1");
         assert_eq!(lvl("1. Summary"), Some(2), "次大字号应是 h2");
+    }
+
+    /// 双栏页面：左右两栏同一基线的行不再拼成一行，输出先左列（上→下）后右列。
+    /// 这是 R4 真实验收里报的核心缺陷（阶段 23：左右分栏同行拼行）。
+    #[test]
+    fn 双栏_先左栏后右栏_不再拼行() {
+        let mut g = Vec::new();
+        for i in 0..4 {
+            let y = 700.0 - i as f32 * 14.0;
+            g.extend(line_of(100.0, y, 10.0, &format!("LeftColumnLine{}", i + 1), false));
+            g.extend(line_of(400.0, y, 10.0, &format!("RightColumnLine{}", i + 1), false));
+        }
+        let lines = glyphs_to_lines(&g);
+
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(
+            texts,
+            vec![
+                "LeftColumnLine1", "LeftColumnLine2", "LeftColumnLine3", "LeftColumnLine4",
+                "RightColumnLine1", "RightColumnLine2", "RightColumnLine3", "RightColumnLine4",
+            ],
+            "应先左列后右列，不得拼行: {texts:?}"
+        );
+    }
+
+    /// 左对齐的通栏标题落在候选带之外的一段空带上：仍会切栏，标题按基线
+    /// 归入左列流的首位 —— 阅读顺序恰好正确（标题 → 左栏 → 右栏）。
+    /// 注意：**居中**横贯带心的通栏元素会被错分进右列流 —— v1 已知局限。
+    #[test]
+    fn 双栏_左对齐通栏标题_归左列首位() {
+        let mut g = Vec::new();
+        // 标题横跨左栏并压过部分候选带（x≈100..320）
+        g.extend(line_of(100.0, 760.0, 12.0, "Report Title Spanning The Left Region", true));
+        for i in 0..4 {
+            let y = 712.0 - i as f32 * 14.0;
+            g.extend(line_of(100.0, y, 10.0, &format!("LeftColumnLine{}", i + 1), false));
+            g.extend(line_of(400.0, y, 10.0, &format!("RightColumnLine{}", i + 1), false));
+        }
+        let lines = glyphs_to_lines(&g);
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts.first(), Some(&"Report Title Spanning The Left Region"), "{texts:?}");
+        assert_eq!(texts[1], "LeftColumnLine1", "{texts:?}");
+        assert_eq!(texts.last(), Some(&"RightColumnLine4"), "{texts:?}");
+        // 标题不得与任何栏行拼在一起
+        assert!(texts.iter().all(|t| !t.contains("LeftColumnLineReport")), "{texts:?}");
+    }
+
+    /// 表格形态（短单元格 + 对齐大间隙）不切栏：切了会把行式阅读变成列式，
+    /// 比 v1 的「保留行序 + 告警」更糟。短格中位长度门槛在此兜底。
+    #[test]
+    fn 表格形态_不切栏_保留行序与告警() {
+        let mut g = Vec::new();
+        let mk_row = |y: f32, a: &str, b: &str| {
+            let mut v = line_of(100.0, y, 10.0, a, false);
+            let off = 100.0 + a.chars().count() as f32 * 5.0 + 60.0;
+            v.extend(word(off, y, 10.0, b, false));
+            v
+        };
+        g.extend(mk_row(700.0, "Name", "Value"));
+        g.extend(mk_row(688.0, "Alpha", "1"));
+        g.extend(mk_row(676.0, "Beta", "2"));
+        g.extend(mk_row(664.0, "Gamma", "3"));
+
+        let lines = glyphs_to_lines(&g);
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts.len(), 4, "应保持 4 行行序: {texts:?}");
+        assert_eq!(texts[0], "Name Value", "表格行不得被拆成两列: {texts:?}");
+
+        let (_, stats, w) = lines_to_blocks(&lines, Options::default());
+        assert!(
+            stats.tableish_regions >= 1 || w.iter().any(|x| matches!(x, Warning::TablesNotConverted { .. })),
+            "表格候选告警应保留"
+        );
+    }
+
+    /// 单栏页面：右缘外的页码不够「右栏质量」，不得切栏（回归保护）。
+    #[test]
+    fn 单栏_右缘页码_不切栏() {
+        let mut g = Vec::new();
+        for i in 0..6 {
+            let y = 700.0 - i as f32 * 14.0;
+            g.extend(line_of(100.0, y, 10.0, &format!("Single column body line number {}", i + 1), false));
+        }
+        g.extend(word(520.0, 700.0, 10.0, "1", false));
+
+        let lines = glyphs_to_lines(&g);
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts.len(), 7, "6 行正文 + 1 行页码: {texts:?}");
+        assert!(texts[0].starts_with("Single column body line number 1"), "{texts:?}");
     }
 
     #[test]

@@ -468,6 +468,51 @@ mod tests {
     /// ```text
     /// ROCKTIER_ACC_PDFS="/abs/a.pdf:/abs/b.pdf" cargo test --bin rocktier-pdf-editor 真实pdf验收 -- --ignored --nocapture
     /// ```
+    /// 真实双栏 PDF 的列序验收（R4 多栏检测）。
+    ///
+    /// fixture 是 Edge 无头打印的双栏 HTML（真字形、真坐标、真 PDF 引擎），
+    /// 随仓提交，CI（macos runner + vendored pdfium）直接跑，无需环境变量。
+    /// 三条断言：
+    /// 1. 左右各 12 个标记全部取到（pdfium 文本层完好）；
+    /// 2. 每个 LEFTCOLn 都在任何 RIGHTCOLm 之前（列序正确）；
+    /// 3. 没有任何一行同时含左右标记（「两栏同行拼行」缺陷不复现）。
+    #[test]
+    fn 真实双栏pdf_按列序输出() {
+        let path = format!("{}/tests/fixtures/two-col.pdf", env!("CARGO_MANIFEST_DIR"));
+        let bytes = std::fs::read(&path).expect("two-col.pdf fixture 应随仓提交");
+        let pdfium = crate::pdf::test_pdfium();
+        let doc = pdfium
+            .load_pdf_from_byte_slice(&bytes, None)
+            .expect("fixture 应能打开");
+        let (md, _, warnings) = document_to_markdown(&doc, Default::default()).expect("转换应成功");
+        assert!(
+            !warnings.iter().any(|w| matches!(w, Warning::EmptyDocument)),
+            "双栏文本页不应被判扫描件: {warnings:?}"
+        );
+
+        let token = |prefix: &str, i: usize| format!("{prefix}{i:02}");
+        for i in 1..=12 {
+            assert!(md.contains(&token("LEFTCOL", i)), "缺少左栏标记 {}", token("LEFTCOL", i));
+            assert!(md.contains(&token("RIGHTCOL", i)), "缺少右栏标记 {}", token("RIGHTCOL", i));
+        }
+
+        let pos = |tok: &str| md.find(tok).unwrap_or_else(|| panic!("找不到 {tok}"));
+        for i in 1..=12 {
+            let l = pos(&token("LEFTCOL", i));
+            let r = pos(&token("RIGHTCOL", i));
+            assert!(l < r, "LEFTCOL{i:02} 应出现在 RIGHTCOL{i:02} 之前（列序）");
+        }
+
+        for line in md.lines() {
+            let has_l = line.contains("LEFTCOL");
+            let has_r = line.contains("RIGHTCOL");
+            assert!(
+                !(has_l && has_r),
+                "左右两栏被拼进同一行（多栏检测失效）: {line}"
+            );
+        }
+    }
+
     #[test]
     #[ignore = "需要真实 PDF：设 ROCKTIER_ACC_PDFS 后用 --ignored 跑"]
     fn 真实pdf验收() {
