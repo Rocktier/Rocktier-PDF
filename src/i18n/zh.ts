@@ -256,6 +256,8 @@ export const zh: Strings = {
       '整份文档都取不到可选文字，几乎可以确定是扫描件，因此没有任何内容可转换。请先用 Rocktier OCR 处理，再从那边导出。',
     scannedPages: '第 {pages} 页没有可选文字，扫描页需要 OCR，已跳过。',
     tablesKept: '检出 {regions} 处疑似表格区域。第一个版本只保留纯文本，不还原列对齐。',
+    columnSplitTables:
+      '检出了 {regions} 处疑似表格区域，且页面按双栏重排了列序 —— 表格行可能被切碎，请人工核对这一页的内容。',
   },
 
   compress: {

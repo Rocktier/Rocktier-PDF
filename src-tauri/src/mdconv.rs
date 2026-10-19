@@ -103,6 +103,11 @@ pub enum Warning {
     LooksScanned { page: usize },
     /// 检测到疑似表格，v1 只输出纯文本
     TablesNotConverted { regions: usize },
+    /// 双栏切分生效，且全文存在表格样区域 —— 长文本单元格的两列表与双栏
+    /// 几何同构（C3：中位 ink 判别器挡不住），切栏可能把表格行切碎。
+    /// 旧路径有 TablesNotConverted 兜底，切栏路径的表格信号会被列序重排
+    /// 打乱，故在切栏与表格同时成立时显式告警，交人工复核。
+    ColumnSplitWithTables { regions: usize },
     /// 字符总数为 0
     EmptyDocument,
 }
@@ -132,8 +137,17 @@ pub struct Options {
 ///    直接拼接会把英文单词粘成 `Helloworld`。间距阈值取字宽的一部分，
 ///    避免把字母间距较大的字体误插空格。
 pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
+    glyphs_to_lines_ex(glyphs).0
+}
+
+/// 带切栏信息的 `glyphs_to_lines`：第二返回值 = 本页是否命中了双栏切分。
+///
+/// 生产链路（pdf_to_md）据此在「切栏页 + 表格区域」同时成立时发
+/// `ColumnSplitWithTables` 告警（C3：切栏可能把长文本单元格的表格行切碎，
+/// 且切栏后的列序重排会打乱表格检测信号，旧兜底告警跟不上）。
+pub fn glyphs_to_lines_ex(glyphs: &[Glyph]) -> (Vec<Line>, bool) {
     if glyphs.is_empty() {
-        return Vec::new();
+        return (Vec::new(), false);
     }
     // pdfium 的 char迭代顺序通常已是阅读序，但仍按基线归并更稳。
     let mut indexed: Vec<&Glyph> = glyphs.iter().collect();
@@ -188,22 +202,28 @@ pub fn glyphs_to_lines(glyphs: &[Glyph]) -> Vec<Line> {
         };
         left.sort_by(by_reading);
         right.sort_by(by_reading);
-        return left
-            .into_iter()
-            .chain(right)
-            .map(|s| finish_line(&s.glyphs))
-            .collect();
+        return (
+            left
+                .into_iter()
+                .chain(right)
+                .map(|s| finish_line(&s.glyphs))
+                .collect(),
+            true,
+        );
     }
 
-    merged
-        .iter()
-        .filter_map(|cluster| {
-            if cluster.is_empty() {
-                return None;
-            }
-            Some(finish_line(cluster))
-        })
-        .collect()
+    (
+        merged
+            .iter()
+            .filter_map(|cluster| {
+                if cluster.is_empty() {
+                    return None;
+                }
+                Some(finish_line(cluster))
+            })
+            .collect(),
+        false,
+    )
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -277,6 +297,11 @@ fn close_seg<'a>(cluster: &[&'a Glyph]) -> Seg<'a> {
 ///   本来就有 TablesNotConverted 告警兜底。
 /// - **零跨越**是硬条件：任何横贯全宽的元素（标题、图）落在候选带上，这条带
 ///   就从「空带并集」里消失 —— 该页自动回退到旧行为，宁可漏切不可切错。
+/// - **合格候选带必须恰好一条**（C2）：≥2 条说明页面不是干净的双栏（三栏、
+///   表格混排等）。旧版取「最宽」一条，会把三栏页的左「栏」切成一、二列
+///   按基线交错输出 —— 比不切更糟。多带即歧义，歧义就整体回退单栏，
+///   由表格告警与人工复核兜底。 lone phantom band（两端对齐文本的幻影栏，
+///   C1）无法自动识别，记入已知局限。
 fn find_two_col_gutter<'a>(segs: &[Seg<'a>]) -> Option<(f32, f32)> {
     const MIN_SEGMENTS_PER_SIDE: usize = 4;
     const MIN_SIDE_MASS_FRAC: f32 = 0.25;
@@ -303,7 +328,7 @@ fn find_two_col_gutter<'a>(segs: &[Seg<'a>]) -> Option<(f32, f32)> {
     }
 
     let need = (((segs.len() as f32) * MIN_SIDE_MASS_FRAC).ceil() as usize).max(MIN_SEGMENTS_PER_SIDE);
-    let mut best: Option<(f32, f32)> = None;
+    let mut candidates: Vec<(f32, f32)> = Vec::new();
     for w in merged.windows(2) {
         let (s0, s1) = (w[0].1, w[1].0);
         if s1 - s0 < MIN_GUTTER_WIDTH {
@@ -319,12 +344,14 @@ fn find_two_col_gutter<'a>(segs: &[Seg<'a>]) -> Option<(f32, f32)> {
         if ink_left < MIN_MEDIAN_INK || ink_right < MIN_MEDIAN_INK {
             continue;
         }
-        match best {
-            Some((b0, b1)) if (b1 - b0) >= (s1 - s0) => {}
-            _ => best = Some((s0, s1)),
-        }
+        candidates.push((s0, s1));
     }
-    best
+    // C2：恰一条合格带才切；零条回退，多条（三栏/混排）同样回退 —— 见函数头注。
+    if candidates.len() == 1 {
+        candidates.into_iter().next()
+    } else {
+        None
+    }
 }
 
 fn median_ink<'g>(segs: impl Iterator<Item = &'g Seg<'g>>) -> usize {
@@ -1302,6 +1329,47 @@ mod tests {
         assert_eq!(texts.last(), Some(&"RightColumnLine4"), "{texts:?}");
         // 标题不得与任何栏行拼在一起
         assert!(texts.iter().all(|t| !t.contains("LeftColumnLineReport")), "{texts:?}");
+    }
+
+    /// 三栏页（C2 回归）：两个候选带都合格时必须回退单栏。
+    /// 旧版取「最宽」带，会把三栏页的左「栏」切成一、二列按基线交错输出 ——
+    /// 比不切更糟。回退后走旧行为（同基线三栏拼成一行），交人工复核。
+    #[test]
+    fn 三栏页_双候选带_回退不切栏() {
+        let mut g = Vec::new();
+        for i in 0..4 {
+            let y = 700.0 - i as f32 * 14.0;
+            g.extend(line_of(100.0, y, 10.0, &format!("FirstColumnLine{}", i + 1), false));
+            g.extend(line_of(400.0, y, 10.0, &format!("SecondColumnLine{}", i + 1), false));
+            g.extend(line_of(700.0, y, 10.0, &format!("ThirdColumnLine{}", i + 1), false));
+        }
+        let (lines, split) = glyphs_to_lines_ex(&g);
+        assert!(!split, "两个合格候选带必须回退单栏，不得切栏");
+
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts.len(), 4, "回退后每基线一行（三栏同行，旧行为）: {texts:?}");
+        for t in &texts {
+            assert!(t.contains("FirstColumnLine"), "{texts:?}");
+            assert!(t.contains("SecondColumnLine"), "{texts:?}");
+            assert!(t.contains("ThirdColumnLine"), "{texts:?}");
+        }
+    }
+
+    /// 真双栏的 ex 版契约：恰好一条合格带 → 切栏且 split=true
+    ///（C2 的「多带回退」不能误伤干净的双栏页）。
+    #[test]
+    fn 双栏页_ex版_切栏并回报true() {
+        let mut g = Vec::new();
+        for i in 0..4 {
+            let y = 700.0 - i as f32 * 14.0;
+            g.extend(line_of(100.0, y, 10.0, &format!("LeftColumnLine{}", i + 1), false));
+            g.extend(line_of(400.0, y, 10.0, &format!("RightColumnLine{}", i + 1), false));
+        }
+        let (lines, split) = glyphs_to_lines_ex(&g);
+        assert!(split, "真双栏必须切栏");
+        let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
+        assert_eq!(texts.first(), Some(&"LeftColumnLine1"), "{texts:?}");
+        assert_eq!(texts.last(), Some(&"RightColumnLine4"), "{texts:?}");
     }
 
     /// 表格形态（短单元格 + 对齐大间隙）不切栏：切了会把行式阅读变成列式，

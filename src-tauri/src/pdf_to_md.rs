@@ -166,8 +166,11 @@ pub fn document_to_markdown(
     // 页眉页脚要在这里剔除 —— 它们只在页边缘，且跨页重复，
     // 这是「正文」与「页面装饰」唯一可靠的区分依据。
     let mut per_page_lines: Vec<Vec<mdconv::Line>> = Vec::with_capacity(page_count as usize);
+    let mut column_split_pages = 0usize;
     for g in &per_page_glyphs {
-        per_page_lines.push(mdconv::glyphs_to_lines(g));
+        let (page_lines, split) = mdconv::glyphs_to_lines_ex(g);
+        column_split_pages += usize::from(split);
+        per_page_lines.push(page_lines);
     }
     drop_running_furniture(&mut per_page_lines, &page_heights);
 
@@ -176,6 +179,15 @@ pub fn document_to_markdown(
     let (blocks, mut stats, mut warnings) = mdconv::lines_to_blocks(&lines, opts);
     stats.pages = page_count as usize;
     stats.lines = lines.len();
+
+    // C3：切栏与表格区域同时存在 → 切栏可能把长文本单元格的表格行切碎，
+    // 且切栏后的列序重排会打乱 table_like_regions 的检测信号 —— 旧路径的
+    // TablesNotConverted 兜底跟不上，故在这里显式告警，交人工复核。
+    if column_split_pages > 0 && stats.tableish_regions > 0 {
+        warnings.push(Warning::ColumnSplitWithTables {
+            regions: stats.tableish_regions,
+        });
+    }
 
     for p in scanned_pages {
         warnings.push(Warning::LooksScanned { page: p });

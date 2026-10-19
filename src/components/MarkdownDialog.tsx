@@ -78,6 +78,11 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
       (w): w is Extract<MarkdownWarning, { kind: 'tablesNotConverted' }> =>
         w.kind === 'tablesNotConverted',
     )?.regions ?? 0;
+  const columnSplitTables =
+    result?.warnings.find(
+      (w): w is Extract<MarkdownWarning, { kind: 'columnSplitWithTables' }> =>
+        w.kind === 'columnSplitWithTables',
+    )?.regions ?? 0;
   const isEmpty = result?.warnings.some((w) => w.kind === 'emptyDocument') ?? false;
 
   return (
@@ -140,6 +145,12 @@ export function MarkdownDialog({ defaultName, onClose }: MarkdownDialogProps) {
             <p className="md-warn" role="status">
               <span className="md-warn-tag">{t('markdown.tag.tables')}</span>
               {t('markdown.tablesKept', { regions: tableRegions })}
+            </p>
+          )}
+          {columnSplitTables > 0 && (
+            <p className="md-warn" role="status">
+              <span className="md-warn-tag">{t('markdown.tag.tables')}</span>
+              {t('markdown.columnSplitTables', { regions: columnSplitTables })}
             </p>
           )}
 

@@ -266,6 +266,8 @@ export const en = {
       'No selectable text on page(s) {pages}. Scanned pages need OCR; they were skipped.',
     tablesKept:
       'Detected {regions} table-like area(s). Version 1 keeps them as plain text — column alignment is not reconstructed.',
+    columnSplitTables:
+      'Detected {regions} table-like area(s) and re-ordered the page into columns — table rows may have been split. Please review this page manually.',
   },
 
   compress: {

@@ -139,6 +139,8 @@ export type MarkdownWarning =
   | { kind: 'looksScanned'; page: number }
   /** 检出疑似表格；v1 只输出纯文本，不猜表格结构 */
   | { kind: 'tablesNotConverted'; regions: number }
+  /** 双栏切分生效且检出表格区域 —— 切栏可能把表格行切碎，需人工复核 */
+  | { kind: 'columnSplitWithTables'; regions: number }
   /** 全文没有可提取文字 */
   | { kind: 'emptyDocument' };
 
