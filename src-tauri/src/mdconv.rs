@@ -224,7 +224,7 @@ struct Seg<'a> {
 
 /// 把一个基线簇按列间大间隙切成段。间隙阈值与 `Line.gaps` 同源（1.5×字宽）：
 /// 正常词距（≈0.25×字号）远到不了这条线，真正的栏间空白才会切开。
-fn segment_row(cluster: &[&Glyph]) -> Vec<Seg<'_>> {
+fn segment_row<'a>(cluster: &[&'a Glyph]) -> Vec<Seg<'a>> {
     if cluster.is_empty() {
         return Vec::new();
     }
@@ -249,7 +249,7 @@ fn segment_row(cluster: &[&Glyph]) -> Vec<Seg<'_>> {
     out
 }
 
-fn close_seg(cluster: &[&Glyph]) -> Seg<'_> {
+fn close_seg<'a>(cluster: &[&'a Glyph]) -> Seg<'a> {
     let ink = cluster
         .iter()
         .map(|g| g.text.chars().filter(|c| !c.is_whitespace()).count())
@@ -277,7 +277,7 @@ fn close_seg(cluster: &[&Glyph]) -> Seg<'_> {
 ///   本来就有 TablesNotConverted 告警兜底。
 /// - **零跨越**是硬条件：任何横贯全宽的元素（标题、图）落在候选带上，这条带
 ///   就从「空带并集」里消失 —— 该页自动回退到旧行为，宁可漏切不可切错。
-fn find_two_col_gutter(segs: &[Seg]) -> Option<(f32, f32)> {
+fn find_two_col_gutter<'a>(segs: &[Seg<'a>]) -> Option<(f32, f32)> {
     const MIN_SEGMENTS_PER_SIDE: usize = 4;
     const MIN_SIDE_MASS_FRAC: f32 = 0.25;
     const MIN_GUTTER_WIDTH: f32 = 8.0;
@@ -327,7 +327,7 @@ fn find_two_col_gutter(segs: &[Seg]) -> Option<(f32, f32)> {
     best
 }
 
-fn median_ink<'a, I: Iterator<Item = &'a Seg>>(segs: I) -> usize {
+fn median_ink<'g, 'b, I: Iterator<Item = &'b Seg<'g>>>(segs: I) -> usize {
     let mut v: Vec<usize> = segs.map(|s| s.ink).collect();
     v.sort_unstable();
     v.get(v.len() / 2).copied().unwrap_or(0)
