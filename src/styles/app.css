@@ -850,6 +850,16 @@
 }
 .license-chip:hover { border-color: var(--accent, currentColor); }
 
+/* 吊销通告（B1）：回执已清、info 与试用到期无从区分，靠调用方传 revoked 标记。
+   文字用 --danger（浅档 #b8342a = 5.02:1、暗档 #ff4a3d = 5.53:1，均达 AA）。 */
+.license-revoked-notice {
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--danger);
+}
+.license-revoked-notice small { color: inherit; }
+
 /* ── 主题切换按钮（家族唯一实现，tokens.css §icon-btn 副本）──────────────
  * 母版：rocktier-docs/docs/rocktier/tokens.css L320-388
  * 各产品各存一份而不是 @import 母版：母版是构建期拷贝源，产品要能独立打包，

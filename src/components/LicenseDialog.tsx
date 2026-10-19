@@ -7,6 +7,8 @@ interface LicenseDialogProps {
   info: LicenseInfo | null;
   onRefresh: () => void;
   onClose: () => void;
+  /** 吊销复检判定 revoked 时为 true —— 顶部显示专属通告（B1：退款客户的正面伤口）。 */
+  revoked?: boolean;
 }
 
 /** 产品页：购买与试用说明的唯一入口，官方站点上的文案以此为准。 */
@@ -19,7 +21,7 @@ const BUY_URL = 'https://rocktier.com/pdf-squeeze';
  * 微软代收、授权也由商店判定，在这里再摆一个输入框只会让人以为要在别处再买一次
  * （而且会给商店审核留下"引导外部购买"的口实）。
  */
-export function LicenseDialog({ info, onRefresh, onClose }: LicenseDialogProps) {
+export function LicenseDialog({ info, onRefresh, onClose, revoked = false }: LicenseDialogProps) {
   const t = useT();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -87,6 +89,12 @@ export function LicenseDialog({ info, onRefresh, onClose }: LicenseDialogProps) 
       }
     >
       <p>{statusLine()}</p>
+
+      {revoked ? (
+        <p className="license-revoked-notice">
+          <small>{t('license.revokedNotice')}</small>
+        </p>
+      ) : null}
 
       {licensed ? (
         <p>

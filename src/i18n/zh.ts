@@ -210,6 +210,8 @@ export const zh: Strings = {
     trialChip: '试用 {days} 天',
     expiredChip: '未激活',
     expired: '试用已结束。查看与搜索仍可用；保存与导出需要许可。',
+    revokedNotice:
+      '该许可已被吊销 —— 通常是退款或支付争议导致。授权状态已重置。在下方重新激活即可继续使用；若你认为这是误判，请写信到 hello@rocktier.com。',
     licensed: '已激活。谢谢。',
     licensedFamily: '已激活 —— 全家桶，所有 Rocktier 应用均已解锁。',
     licensedNote: '此副本已激活。此后不再有任何校验，也不联网。',

@@ -104,9 +104,15 @@ export function App() {
       try { localStorage.setItem(UPDATE_CHECKED_KEY, String(result.checkedAt)); } catch { /* 隐私模式下忽略 */ }
       setUpdateState(result.hasUpdate ? 'available' : 'uptodate');
       /* 顺带吊销复检：同一次点击、同一承诺（只在点击时联网）。revoked → 清回执，
-         授权状态回到未激活；下一次写操作由既有 LICENSE_EXPIRED 流程接管。 */
+         授权状态回到未激活，并立即弹激活对话框（B2：此前只清回执不弹窗，用户
+         要等到下一次写操作被 LICENSE_EXPIRED 拦截才知道出事；B1：对话框顶部
+         显示吊销专属通告，而非让人以为试用到期）。 */
       const verdict = await revalidateLicence();
-      if (verdict === 'revoked') refreshLicense();
+      if (verdict === 'revoked') {
+        refreshLicense();
+        setLicenseRevoked(true);
+        setDialog('license');
+      }
     } catch {
       setUpdateState('failed');
     } finally {
@@ -123,6 +129,9 @@ export function App() {
   const [jump, setJump] = useState<{ index: number; token: number } | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [license, setLicense] = useState<LicenseInfo | null>(null);
+  /* B1：吊销复检判定 revoked 时置位，激活框顶部显示「许可已被吊销」专属通告 ——
+     回执已清、info 与试用到期无从区分，verdict 是唯一可靠的传递点。 */
+  const [licenseRevoked, setLicenseRevoked] = useState(false);
 
   const refreshLicense = useCallback(() => {
     void licenseStatus()
@@ -987,8 +996,9 @@ export function App() {
       {dialog === 'license' ? (
         <LicenseDialog
           info={license}
+          revoked={licenseRevoked}
           onRefresh={refreshLicense}
-          onClose={() => setDialog(null)}
+          onClose={() => { setDialog(null); setLicenseRevoked(false); }}
         />
       ) : null}
       {dialog === 'compress' && doc ? (
