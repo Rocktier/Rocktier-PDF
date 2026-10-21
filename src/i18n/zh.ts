@@ -242,6 +242,9 @@ export const zh: Strings = {
     never: '从未检查',
     download: '获取 {v}',
     privacyNote: '点击才会联网，应用不会自动检查',
+    close: '关闭',
+    openReleases: '打开发布页',
+    openReleasesHint: '也可以直接打开发布页查看。',
   },
   markdown: {
     title: '导出为 Markdown',

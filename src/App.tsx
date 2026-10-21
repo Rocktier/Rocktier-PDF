@@ -49,14 +49,11 @@ import {
   } from './services/engine';
 import { RECENT_MAX, clearStoredRecent, readRecent, writeRecent } from './utils';
 import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
-import { checkForUpdates, currentVersion, type UpdateResult } from './services/updates';
-
-const UPDATE_CHECKED_KEY = 'rocktier.pdf.updateCheckedAt';
+import { checkForUpdates, currentVersion, type UpdateResult, type UpdateState } from './services/updates';
+import { UpdateDialog } from './components/UpdateDialog';
 
 /** 打包时写死，与 tag 同源 —— 不会出现系统里装着新版本而代码里写着旧版本的错位。 */
 const APP_VERSION = currentVersion();
-
-type UpdateState = 'idle' | 'checking' | 'uptodate' | 'available' | 'failed';
 
 /** 三态：auto 跟随系统 → light → dark → auto（家族 §6.5 唯一状态机）。 */
 type Theme = 'auto' | 'light' | 'dark';
@@ -86,11 +83,9 @@ export function App() {
      这是「除非你要求，应用不会联网」这条承诺的落点。 */
   const [updateState, setUpdateState] = useState<UpdateState>('idle');
   const [updateResult, setUpdateResult] = useState<UpdateResult | null>(null);
-  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(() => {
-    const raw = localStorage.getItem(UPDATE_CHECKED_KEY);
-    const n = raw ? Number(raw) : 0;
-    return n > 0 ? n : null;
-  });
+  /* 结果框的开合。只由菜单「检查更新…」打开 —— 右下角常驻入口已移除
+     （fixed 定位不稳定，容易盖住底部内容，Compressor v0.1.10 实测复现）。 */
+  const [updateOpen, setUpdateOpen] = useState(false);
   const updateChecking = useRef(false);
 
   const runUpdateCheck = useCallback(async () => {
@@ -100,8 +95,6 @@ export function App() {
     try {
       const result = await checkForUpdates();
       setUpdateResult(result);
-      setLastCheckedAt(result.checkedAt);
-      try { localStorage.setItem(UPDATE_CHECKED_KEY, String(result.checkedAt)); } catch { /* 隐私模式下忽略 */ }
       setUpdateState(result.hasUpdate ? 'available' : 'uptodate');
       /* 顺带吊销复检：同一次点击、同一承诺（只在点击时联网）。revoked → 清回执，
          授权状态回到未激活，并立即弹激活对话框（B2：此前只清回执不弹窗，用户
@@ -352,6 +345,7 @@ export function App() {
           refreshLicense();
           break;
         case 'check-updates':
+          setUpdateOpen(true);
           void runUpdateCheck();
           break;
         case 'website':
@@ -941,41 +935,16 @@ export function App() {
         }}
       />
 
-      {/* 更新检查入口。固定右下角 —— 点击才联网：启动时、工作中、后台都不检查，
-          见 services/updates.ts 头注。 */}
-      <div className={`update-corner${updateState === 'available' ? ' has-update' : ''}`}>
-        <button
-          type="button"
-          className="update-line"
-          onClick={() => void runUpdateCheck()}
-          disabled={updateState === 'checking'}
-          title={t('update.privacyNote')}
-        >
-          <span className="update-ver">v{APP_VERSION}</span>
-          <span className="update-sep" aria-hidden="true">·</span>
-          <span className="update-action">
-            {updateState === 'checking' ? t('update.checking') : t('update.check')}
-          </span>
-        </button>
-        <div className="update-note" role="status" aria-live="polite">
-          {updateState === 'uptodate' && t('update.upToDate')}
-          {updateState === 'failed' && t('update.failed')}
-          {updateState === 'available' && updateResult && (
-            <button
-              type="button"
-              className="update-get"
-              onClick={() => void openUrl(updateResult.url).catch(() => {})}
-              title={t('update.available', { v: updateResult.latest })}
-            >
-              {t('update.download', { v: updateResult.latest })}
-            </button>
-          )}
-          {updateState === 'idle' &&
-            t('update.lastChecked', {
-              date: lastCheckedAt ? formatCheckedAt(lastCheckedAt) : t('update.never'),
-            })}
-        </div>
-      </div>
+      {/* 更新检查：入口在帮助菜单「检查更新…」，结果弹 UpdateDialog。
+          右下角常驻悬浮入口已移除（fixed 定位不稳定，容易盖住底部内容）。 */}
+      {updateOpen && (
+        <UpdateDialog
+          state={updateState}
+          result={updateResult}
+          currentVersion={APP_VERSION}
+          onClose={() => setUpdateOpen(false)}
+        />
+      )}
 
       {dialog === 'merge' ? (
         <MergeDialog onClose={() => setDialog(null)} onRun={pdf.merge} />
@@ -1095,14 +1064,3 @@ function resolveTheme(mode: Theme): Resolved {
   return mode === 'auto' ? systemTheme() : mode;
 }
 
-/**
- * 「上次检查」的时间戳格式化。跟随界面语言 —— documentElement.lang
- * 由 i18n 模块维护（中文界面下是 zh-CN），避免中英混排。
- */
-function formatCheckedAt(ts: number): string {
-  try {
-    return new Date(ts).toLocaleDateString(document.documentElement.lang || 'en');
-  } catch {
-    return new Date(ts).toISOString().slice(0, 10);
-  }
-}

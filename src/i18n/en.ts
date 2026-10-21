@@ -248,6 +248,9 @@ export const en = {
     never: 'Never',
     download: 'Get {v}',
     privacyNote: 'Only checks when you click — the app never checks on its own',
+    close: 'Close',
+    openReleases: 'Open releases',
+    openReleasesHint: 'You can also open the releases page directly.',
   },
   markdown: {
     title: 'Export as Markdown',
