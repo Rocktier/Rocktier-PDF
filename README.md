@@ -105,7 +105,7 @@ node scripts/fetch-pdfium.mjs --build=8057 --force
 |---|---|---|
 | Windows | x64 | Supported — shipped as MSIX / MSI / NSIS |
 | macOS | Apple Silicon (arm64) | Supported — shipped as DMG (ad-hoc signed, not notarised) |
-| macOS | Intel (x64) | Builds from source (`--target x86_64-apple-darwin`); not shipped |
+| macOS | Intel (x64) | Supported — built by CI (ad-hoc signed, not notarised) |
 | Linux | x64 | Builds, untested |
 
 ---

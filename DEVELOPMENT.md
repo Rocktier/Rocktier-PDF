@@ -70,7 +70,7 @@ go build -o ../src-tauri/bin/pdf-engine .
 
 ## Platform Support
 
-- **macOS**: Apple Silicon only (ARM64).
+- **macOS**: Apple Silicon (arm64) and Intel (x86_64).
 - **Windows**: x64 only. Builds produce MSI, NSIS installer, and ZIP portable.
 
 ## Commit Convention

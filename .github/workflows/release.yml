@@ -50,9 +50,21 @@ jobs:
         run: cargo test --bin rocktier-pdf-editor
 
   build-macos:
-    name: macOS (Apple Silicon)
+    name: macOS (${{ matrix.arch }})
     needs: test
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: aarch64
+            target: aarch64-apple-darwin
+            filearch: arm64
+          - runner: macos-15-intel
+            arch: x64
+            target: x86_64-apple-darwin
+            filearch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -62,12 +74,30 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@1.98.0
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          key: ${{ matrix.arch }}
 
       - name: Install frontend deps
         run: npm ci
 
+      # Homebrew publishes no Intel bottle for qpdf, so the first Intel run
+      # builds it from source (along with openssl@4 and jpeg-turbo). Cache the
+      # provisioned sidecar; bump the key when qpdf is upgraded.
+      - name: Cache qpdf sidecar (Intel)
+        if: matrix.arch == 'x64'
+        id: qpdf-cache
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/qpdf
+          key: qpdf-x64-v1
+
       - name: Provision qpdf sidecar
+        if: matrix.arch != 'x64' || steps.qpdf-cache.outputs.cache-hit != 'true'
         run: |
           brew install qpdf
           bash scripts/provision-qpdf-macos.sh
@@ -75,7 +105,24 @@ jobs:
       # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at
       # cargo check - which is exactly how the v1.0.0 run failed.
       - name: Build
-        run: npm run tauri:build -- --target aarch64-apple-darwin
+        run: npm run tauri:build -- --target ${{ matrix.target }}
+
+      # The Intel runner is the only place where the x86_64 runtime path can be
+      # exercised for real, so run the tests there instead of on Apple Silicon.
+      - name: cargo test (Intel)
+        if: matrix.arch == 'x64'
+        working-directory: src-tauri
+        run: cargo test --bin rocktier-pdf-editor
+
+      - name: Verify sidecar architecture
+        if: matrix.arch == 'x64'
+        run: |
+          set -euo pipefail
+          file src-tauri/resources/qpdf/qpdf
+          file src-tauri/resources/pdfium-runtime/libpdfium.dylib
+          src-tauri/resources/qpdf/qpdf --version
+          file src-tauri/resources/qpdf/qpdf | grep -q x86_64
+          file src-tauri/resources/pdfium-runtime/libpdfium.dylib | grep -q x86_64
 
       - name: Sign the app bundle, notarize it, and repack the DMG
         env:
@@ -102,9 +149,9 @@ jobs:
           # A v1.0.10 downloader hit "damaged" exactly there (release.yml used to
           # say so). Replace the bundle inside the image, re-compress, then seal the
           # image itself.
-          app=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos \
+          app=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" \
             -maxdepth 1 -name '*.app' | head -1)
-          dmg=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg \
+          dmg=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" \
             -name '*.dmg' | head -1)
 
           sign_app=(-s -)
@@ -168,16 +215,23 @@ jobs:
 
       - name: Package app.zip
         run: |
-          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' | head -1)
+          APP=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' | head -1)
           [ -z "$APP" ] && { echo "::error::.app not found"; exit 1; }
-          ditto -c -k --keepParent "$APP" "Rocktier.PDF_aarch64.app.zip"
+          ditto -c -k --keepParent "$APP" "Rocktier.PDF_${{ matrix.arch }}.app.zip"
+
+      - name: Verify bundle architecture
+        run: |
+          set -euo pipefail
+          APP=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' | head -1)
+          [ -z "$APP" ] && { echo "::error::.app not found"; exit 1; }
+          file "$APP/Contents/MacOS/"* | tee /dev/stderr | grep -q '${{ matrix.filearch }}'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-arm64
+          name: macos-${{ matrix.arch }}
           path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-            Rocktier.PDF_aarch64.app.zip
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            Rocktier.PDF_${{ matrix.arch }}.app.zip
 
   build-windows:
     name: Windows (x64)
@@ -268,7 +322,7 @@ jobs:
       - name: Attach installers to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REQUIRED_ASSETS: '\.dmg$ \.app\.zip$ \.msi$ \.exe$ \.msix$ \.msixbundle$'
+          REQUIRED_ASSETS: '_aarch64\.dmg$ _x64\.dmg$ _aarch64\.app\.zip$ _x64\.app\.zip$ \.msi$ \.exe$ \.msix$ \.msixbundle$'
         run: |
           set -euo pipefail
           # `gh` resolves which repository to act on from the working directory's git
