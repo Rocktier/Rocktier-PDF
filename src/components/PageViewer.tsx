@@ -153,8 +153,10 @@ function Page({
       .then((p) => {
         if (alive) setRendered(p);
       })
-      .catch(() => {
-        /* leave the placeholder in place */
+      .catch((err) => {
+        /* 失败留在占位符上，但绝不允许无声 —— 静默吞掉曾让一次 IPC 循环
+           故障在整版里伪装成"PDF 打不开"。至少留一条可诊断的线索。 */
+        console.error(`render_page failed (page ${page.index}, width ${width})`, err);
       });
 
     return () => {

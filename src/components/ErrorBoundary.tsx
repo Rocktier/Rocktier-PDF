@@ -28,46 +28,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      /* 视觉走 .error-fallback 类（app.css）：内联样式是一笔设计债 ——
+         兜底 UI 也该吃同一套令牌，主题切换时才不会脱队（2026-10-25 审计 D-78 债务项） */
       return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            gap: 12,
-            fontFamily: 'inherit',
-            color: 'var(--text-primary, #fff)',
-            background: 'var(--bg-primary, #0a0a0a)',
-            padding: 24,
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: 16, margin: 0 }}>出错了 / Something went wrong</h2>
-          <pre
-            style={{
-              maxWidth: 640,
-              whiteSpace: 'pre-wrap',
-              fontSize: 12,
-              opacity: 0.7,
-              maxHeight: 160,
-              overflow: 'auto',
-            }}
-          >
+        <div className="error-fallback">
+          <h1 className="error-fallback-title">出错了 / Something went wrong</h1>
+          <pre className="error-fallback-msg">
             {String(this.state.error?.message || this.state.error)}
           </pre>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '8px 20px',
-              borderRadius: 8,
-              border: '1px solid var(--border, rgba(255,255,255,0.15))',
-              background: 'var(--accent, #fff)',
-              color: 'var(--on-accent, #000)',
-              cursor: 'pointer',
-            }}
-          >
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
             重新加载 / Reload
           </button>
         </div>

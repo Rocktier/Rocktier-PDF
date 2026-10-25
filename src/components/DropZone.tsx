@@ -29,7 +29,9 @@ export function DropZone({
     <div className={`empty${dragActive ? ' dragover' : ''}`}>
       <div className="dropzone">
         <DocumentGlyph />
-        <h2>{t('empty.title')}</h2>
+        {/* 空态页的主标题就是这一行 —— 用 h1 而非 h2：外层已有 <main>，
+            标题序列应从 h1 开始，不能跳级（2026-10-25 审计 D-78） */}
+        <h1>{t('empty.title')}</h1>
         <p>{t('empty.subtitle')}</p>
         <button className="btn btn-primary" onClick={onOpen} style={{ marginTop: 4 }}>
           {t('empty.browse')}

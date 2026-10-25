@@ -1010,7 +1010,10 @@ export function App() {
       />
 
       {doc ? (
-        <div className="main">
+        /* main 地标 + 文档标题 h1（视觉隐藏）：文档壳类应用的可读结构 ——
+           读屏用户在标题序列里应该能直接跳到"当前打开的文档"（2026-10-25 审计 D-78：整屏 0 个标题、无 main） */
+        <main className="main">
+          <h1 className="visually-hidden">{doc.name}</h1>
           <ThumbnailRail
             pages={doc.pages}
             revision={pdf.revision}
@@ -1057,15 +1060,18 @@ export function App() {
               />
             ) : null}
           </div>
-        </div>
+        </main>
       ) : (
-        <DropZone
-          onOpen={openFile}
-          dragActive={dragActive}
-          recent={recent}
-          onOpenRecent={requestOpen}
-          onClearRecent={clearRecent}
-        />
+        /* 空态同样是主内容，包 main 让"有无文档"两种状态都恰好有一个 main 地标（D-78） */
+        <main className="empty-main">
+          <DropZone
+            onOpen={openFile}
+            dragActive={dragActive}
+            recent={recent}
+            onOpenRecent={requestOpen}
+            onClearRecent={clearRecent}
+          />
+        </main>
       )}
 
       <StatusBar

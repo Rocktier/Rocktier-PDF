@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   closeDocument,
   deletePages,
@@ -292,32 +292,73 @@ export function usePdf() {
 
   const clearError = useCallback(() => setError(null), []);
 
-  return {
-    doc,
-    revision,
-    busy,
-    error,
-    selected,
-    setSelected,
-    openPath,
-    openPathWithResult,
-    close,
-    save,
-    saveAs,
-    removePages,
-    rotate,
-    move,
-    extract,
-    merge,
-    split,
-    stamp,
-    markup,
-    note,
-    signature,
-    redact,
-    stepHistory,
-    refresh,
-    clearError,
-    applyDoc,
-  };
+  /* ── 返回对象必须身份稳定（2026-10-25 审计 P0 根因）────────────────────
+     此前这里每次渲染返回一个新对象字面量，而 App.tsx 有 9 处 useCallback 依赖
+     数组直接写了整个 `pdf`。后果：runOpen/requestOpen 身份每帧变化 → 挂在
+     [requestOpen] 上的 initialFile / 拖拽订阅 effect 每帧重跑 → 打开文档 →
+     setBusy 触发下一帧渲染 → 无限循环。实测症状：状态条永远 "Working"、
+     24 个工具栏按钮全部禁用、render 缓存每轮被 applyDoc 清空、渲染结果总是
+     赶不上 effect cleanup（alive=false）被丢弃，正文永远停留在占位符 ——
+     且只在"系统要求打开文件"路径（双击 PDF / 文件关联 / CLI 参数）触发，
+     应用内对话框打开不触发，所以此前手测从未暴露。
+     规则：每个成员都已是 useCallback/useState（身份自带稳定性）；新增成员时
+     必须同时加进 useMemo 的对象与依赖两份清单，漏一边都会变成静默旧值。 */
+  return useMemo(
+    () => ({
+      doc,
+      revision,
+      busy,
+      error,
+      selected,
+      setSelected,
+      openPath,
+      openPathWithResult,
+      close,
+      save,
+      saveAs,
+      removePages,
+      rotate,
+      move,
+      extract,
+      merge,
+      split,
+      stamp,
+      markup,
+      note,
+      signature,
+      redact,
+      stepHistory,
+      refresh,
+      clearError,
+      applyDoc,
+    }),
+    [
+      doc,
+      revision,
+      busy,
+      error,
+      selected,
+      setSelected,
+      openPath,
+      openPathWithResult,
+      close,
+      save,
+      saveAs,
+      removePages,
+      rotate,
+      move,
+      extract,
+      merge,
+      split,
+      stamp,
+      markup,
+      note,
+      signature,
+      redact,
+      stepHistory,
+      refresh,
+      clearError,
+      applyDoc,
+    ]
+  );
 }

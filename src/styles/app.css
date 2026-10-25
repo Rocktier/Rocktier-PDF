@@ -160,6 +160,28 @@
   min-height: 0;
 }
 
+/* 空态的 main 外壳：flex 列布局，让 .empty 的 flex:1 生效（D-78 main 地标） */
+.empty-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 读屏专用视觉隐藏：文档壳类应用的 h1（当前文档名）不需要重复可见文案，
+   但要出现在无障碍树与阅读顺序里（D-78） */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ── Thumbnail rail ───────────────────────────────────────────── */
 .rail {
   width: 148px;
@@ -514,7 +536,7 @@
   opacity: 0.85;
 }
 
-.dropzone h2 {
+.dropzone h1 {
   margin: 0;
   font-size: 17px;
   font-weight: 600;
@@ -837,18 +859,9 @@
 }
 
 /* Trial / not-activated chip in the status bar. Clickable: it is the entry point
-   to the License dialog (the site tells buyers to go to "License" in the app). */
-.license-chip {
-  border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
-  background: transparent;
-  color: inherit;
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.license-chip:hover { border-color: var(--accent, currentColor); }
+   to the License dialog (the site tells buyers to go to "License" in the app).
+   样式已收编为母版 tokens.css 的 .badge-license（2026-10-25 审计 D-78），
+   本地不再保留视觉定义。 */
 
 /* 吊销通告（B1）：回执已清、info 与试用到期无从区分，靠调用方传 revoked 标记。
    文字用 --danger（浅档 #b8342a = 5.02:1、暗档 #ff4a3d = 5.53:1，均达 AA）。 */
@@ -978,4 +991,36 @@
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+}
+
+/* ── 全局错误兜底（ErrorBoundary）──────────────────────────────
+   从内联样式收敛成类：兜底 UI 同样吃家族令牌，主题切换不脱队
+   （2026-10-25 审计 D-78 债务项）。样式沿用内联版的取值。 */
+.error-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  padding: 24px;
+  text-align: center;
+}
+
+.error-fallback-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.error-fallback-msg {
+  max-width: 640px;
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  opacity: 0.7;
+  max-height: 160px;
+  overflow: auto;
 }

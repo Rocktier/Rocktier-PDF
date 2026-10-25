@@ -113,8 +113,10 @@ function Thumb({
       .then((p) => {
         if (alive) setRendered(p);
       })
-      .catch(() => {
-        /* the placeholder stays; surfacing one bad page is not worth a toast */
+      .catch((err) => {
+        /* 占位符保持原样即可，但失败必须留下日志 —— 静默吞错曾掩盖过
+           渲染链路的整体故障。 */
+        console.error(`render_page (thumb) failed (page ${page.index}, width ${width})`, err);
       });
 
     return () => {

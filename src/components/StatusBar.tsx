@@ -77,7 +77,7 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
 
       <div style={{ flex: 1 }} />
       {showLicenseChip ? (
-        <button type="button" className="license-chip" onClick={onLicenseClick}>
+        <button type="button" className="badge-license" onClick={onLicenseClick}>
           {license.status === 'expired'
             ? t('license.expiredChip')
             : t('license.trialChip', { days: license.daysLeft })}
