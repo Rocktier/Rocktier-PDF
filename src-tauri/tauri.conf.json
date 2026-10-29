@@ -11,7 +11,8 @@
     "resources": [
       "resources/qpdf",
       "resources/pdfium-runtime",
-      "resources/legal"
+      "resources/legal",
+      "resources/sign-engine"
     ],
     "icon": [
       "icons/32x32.png",
@@ -53,7 +54,7 @@
     }
   },
   "productName": "Rocktier PDF",
-  "version": "1.0.30",
+  "version": "1.1.0",
   "identifier": "Rocktier.RocktierPDF",
   "app": {
     "windows": [

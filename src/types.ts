@@ -19,11 +19,9 @@ export interface DocumentInfo {
   /** True when there are unsaved edits. */
   dirty: boolean;
   pages: PageInfo[];
-  /**
-   * Always `false` today: signatures this app places are visual image stamps,
-   * not cryptographic digital signatures (P0-15). The UI must keep saying so
-   * until a real digital-signature feature exists.
-   */
+  /** 带密码学签名：只读打开，除追加签名外的一切编辑都会被后端拒绝。 */
+  readOnly: boolean;
+  /** 由后端签名探测决定，不再是恒 false。 */
   hasCryptographicSignature: boolean;
 }
 
@@ -40,6 +38,11 @@ export interface RenderedPage {
 export interface PathResult {
   path: string;
   size: number;
+}
+
+/** `save_document` 的返回值。`readOnly` 表示写出之后是否仍处于只读状态。 */
+export interface SaveResult extends PathResult {
+  readOnly: boolean;
 }
 
 export interface SearchHit {
@@ -65,8 +68,12 @@ export interface FormFieldInfo {
 
 export type MarkupKind = 'highlight' | 'underline' | 'strikeout';
 
-/** Any annotation tool the user can arm: rect marks, notes, and signatures. */
-export type AnnotTool = MarkupKind | 'note' | 'sign';
+/**
+ * Any annotation tool the user can arm: rect marks, notes, and signatures.
+ * `sign` 是图片印章（视觉），`dsign` 是数字签名的**放置模式**：点页面取坐标，
+ * 不直接落任何注释，所以它不需要 onMarkup 那条拖拽分支。
+ */
+export type AnnotTool = MarkupKind | 'note' | 'sign' | 'dsign';
 
 /** A rectangle the user marked for redaction, in PDF points (origin bottom-left). */
 export interface RedactRect {
@@ -148,4 +155,48 @@ export interface MarkdownConversion {
   markdown: string;
   stats: MarkdownStats;
   warnings: MarkdownWarning[];
+}
+
+/* ── 数字签名（T7–T11）───────────────────────────────────────────────── */
+
+/** 证书元数据，镜像 Rust `sign::CertMeta`。 */
+export interface CertMeta {
+  subject: string;
+  cn: string;
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  keyType: string;
+  chainLen: number;
+  expired: boolean;
+  allowExpired: boolean;
+}
+
+export interface CertInfo {
+  name: string;
+  created: string;
+  path: string;
+  meta?: CertMeta;
+}
+
+/** 单个签名者的验签结论。 */
+export interface SignerInfo {
+  name: string;
+  validSignature: boolean;
+  trustedIssuer: boolean;
+  extKeyUsageValid: boolean;
+  revoked: boolean;
+  signatureTime: string;
+  timestampStatus: string;
+  status: 'valid' | 'invalid' | 'untrusted' | string;
+}
+
+export type VerifyVerdict = 'VALID' | 'UNTRUSTED' | 'INVALID' | 'NO_SIGNATURES';
+
+/** 引擎验签结果。`NO_SIGNATURES` 与 `INVALID` 是两件事，界面必须分开说。 */
+export interface VerifyReport {
+  verdict: VerifyVerdict;
+  exitCode: number;
+  summary: string;
+  signers: SignerInfo[];
 }

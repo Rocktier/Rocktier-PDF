@@ -21,6 +21,11 @@ pub struct OpenDoc {
     /// not. Recorded once at open time by reading the trailer with lopdf.
     pub was_encrypted: bool,
     pub dirty: bool,
+    /// 磁盘上的文件带密码学签名。整份重写会毁掉签名，因此除「追加签名」外
+    /// 一切编辑都必须拒绝（save 由 SIGNED_READ_ONLY 硬拦）。
+    pub read_only: bool,
+    /// 打开时检出签名对象的个数（不是验签结果，验签在验证页按需跑）。
+    pub signature_count: usize,
     /// Byte snapshots taken before each mutation (newest last).
     pub undo: Vec<Vec<u8>>,
     /// Snapshots popped by undo, available again via redo (newest last).

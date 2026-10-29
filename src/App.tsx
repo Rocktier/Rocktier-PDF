@@ -16,12 +16,14 @@ import { MarkdownDialog } from './components/MarkdownDialog';
 import { LicenseDialog } from './components/LicenseDialog';
 import { SplitDialog } from './components/SplitDialog';
 import { StampDialog } from './components/StampDialog';
+import { SignDialog, type SignTab, type SignPlacement } from './components/SignDialog';
 import { StatusBar } from './components/StatusBar';
 import { ThumbnailRail } from './components/ThumbnailRail';
 import { Toolbar } from './components/Toolbar';
 import { usePdf } from './hooks/usePdf';
 import { useI18n, useT } from './i18n';
 import { localizeError } from './services/errorText';
+import { signCapabilities } from './services/sign';
 import {
   buildMenu,
   copyText,
@@ -48,7 +50,7 @@ import {
   type LicenseInfo,
   } from './services/engine';
 import { RECENT_MAX, clearStoredRecent, readRecent, writeRecent } from './utils';
-import type { AnnotTool, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
+import type { AnnotTool, DocumentInfo, MarkupRect, RedactRect, SearchHit, StampKind } from './types';
 import { checkForUpdates, currentVersion, type UpdateResult, type UpdateState } from './services/updates';
 import { UpdateDialog } from './components/UpdateDialog';
 
@@ -67,6 +69,7 @@ type Dialog =
   | 'compress'
   | 'markdown'
   | 'license'
+  | 'digital-sign'
   | null;
 
 /* 2026-10-04 键改名：家族命名空间统一用「.」（此前 PDF 用的是 "rocktier-pdf-editor.theme"，
@@ -148,6 +151,56 @@ export function App() {
   const [redactConfirm, setRedactConfirm] = useState(false);
   const [noteAt, setNoteAt] = useState<{ page: number; x: number; y: number } | null>(null);
   const [sigPath, setSigPath] = useState<string | null>(null);
+
+  /* ── 数字签名 ─────────────────────────────────────────────────── */
+  const [signTab, setSignTab] = useState<SignTab>('sign');
+  /** 用户在真实页面上点出来的签名位置（未旋转 PDF 坐标，页码 0 起步）。 */
+  const [signPlacement, setSignPlacement] = useState<SignPlacement | null>(null);
+  /** 签名引擎在不在这个安装包里 —— 不在就禁用工具栏入口（引擎缺失没有可用路径）。 */
+  const [signEngine, setSignEngine] = useState(false);
+  /**
+   * 放置模式：对话框**收起但不卸载**。坐标只能从真实页面上点出来，模态框挡着就没法点；
+   * 而直接卸载对话框会连带丢掉 SignTabSign 里的证书选择、签署人姓名和外观图片
+   * （那是它的本地状态）—— 与 Task 10 把标签页做成常驻挂载是同一个理由。
+   *
+   * 必须**派生而不是存储**：armed 的定义就是「对话框开着 + dsign 工具拿着」，所以任何
+   * 改动 `dialog` 或 `markupTool` 的既有转换都会自动解除它。存一个布尔的话有两条实测漏路：
+   * (A) 点工具栏里直接 setDialog 的那几支（merge/stamp/security…）再关掉，坐标一点击页面
+   * 就把用户没要求的签名框拉回来；(B) 换一支 markup 工具后 `markupTool` 已不是 dsign，
+   * 但收起态的对话框连同它的 Esc 监听还活着，页面层的 annot-layer 也继续盖着，什么都选不了。
+   */
+  const signPlacementMode = dialog === 'digital-sign' && markupTool === 'dsign';
+
+  // 引擎是否随包只取决于安装，与会话里打开哪份文档无关，所以挂载时探测一次。
+  // 浏览器 dev 构建没有后端：拒绝也按「不可用」处理，界面就不会承诺做不到的事。
+  useEffect(() => {
+    void signCapabilities()
+      .then((c) => setSignEngine(c.engineAvailable))
+      .catch(() => setSignEngine(false));
+  }, []);
+
+  /**
+   * 旧坐标作废的两个触发点：
+   * - 换文档（打开另一份 / 签完改名）—— path 变了，坐标指的是另一份文件的另一页。
+   * - 文档结构变了 —— 删页/移页/旋转/撤销这些一律经 `usePdf.applyDoc`，它会 revision+1。
+   *   只看 path 拦不住这一类：原地保存（工具栏「保存」/签署前的落盘）不改 path，于是
+   *   「在第 10 页点好位置 → 删掉前面 3 页 → 原地保存 → 签名」会把签名落到用户从没点过的页上
+   *   —— 索引还在范围内，后端 SIGN_PAGE_OUT_OF_RANGE 根本不会触发。
+   * 反向也要保住：`pdf.save()` 走的是 `adoptSaved`，它**不**自增 revision，
+   * 所以「选好位置 → 先保存 → 再签」这条正路留着坐标。
+   */
+  useEffect(() => {
+    setSignPlacement(null);
+  }, [pdf.doc?.path, pdf.revision]);
+
+  // 签名对话框不在了，dsign 这支工具就没有能落地的地方：留着它，页面里的 annot-layer
+  // 会一直盖在页面上（文字选不了、页也点不动），而界面上没有任何「工具还拿着」的迹象。
+  // 收起态的定义是 dialog === 'digital-sign'，所以工具栏那几支直接 setDialog 的入口
+  // （merge/stamp/security…）以及签名完成后的收尾，都由这里统一兜住。
+  useEffect(() => {
+    if (dialog !== 'digital-sign') setMarkupTool((tool) => (tool === 'dsign' ? null : tool));
+  }, [dialog]);
+
   const [pwPrompt, setPwPrompt] = useState<{ path: string; incorrect: boolean } | null>(null);
   // 关窗 / 打开另一个文件 / 拖拽替换，三条替换路径共用一个守卫。
   const [guard, setGuard] = useState<
@@ -278,19 +331,30 @@ export function App() {
     docPathRef.current = pdf.doc?.path ?? null;
   }, [pdf.doc?.path]);
 
+  /* 这里必须只跑一次。
+     `requestOpen` 经 `runOpen` 依赖整个 `usePdf()` 返回值，而那个对象每次渲染
+     都是新的 —— 把它放进依赖数组，effect 就每帧重跑。`initial_file` 后端只
+     clone 不 take（热启动还会把新路径写回同一个 slot），于是每帧都会重新打开
+     同一份文档：revision 自增 → 渲染缓存被清 → 大页面永远渲染不完，界面卡在
+     「处理中」。用 ref 拿最新回调，effect 才能稳定在挂载时执行一次。 */
+  const requestOpenRef = useRef(requestOpen);
+  useEffect(() => {
+    requestOpenRef.current = requestOpen;
+  }, [requestOpen]);
+
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
     void initialFile()
       .then((path) => {
-        if (!disposed && path) requestOpen(path);
+        if (!disposed && path && path !== docPathRef.current) requestOpenRef.current(path);
       })
       .catch(() => {
         /* browser dev builds have no backend */
       });
     void onOpenFile((path) => {
       if (disposed || path === docPathRef.current) return;
-      requestOpen(path);
+      requestOpenRef.current(path);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -299,7 +363,7 @@ export function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [requestOpen]);
+  }, []);
 
   /* ── Native menu ────────────────────────────────────────────── */
   useEffect(() => {
@@ -663,7 +727,9 @@ export function App() {
 
   const applyMarkup = useCallback(
     async (rect: MarkupRect) => {
-      if (!markupTool || markupTool === 'note' || markupTool === 'sign') return;
+      if (!markupTool || markupTool === 'note' || markupTool === 'sign' || markupTool === 'dsign') {
+        return;
+      }
       const color: [number, number, number] =
         markupTool === 'highlight' ? [255, 235, 59] : [229, 57, 53];
       const opacity = markupTool === 'highlight' ? 0.35 : 0.9;
@@ -745,8 +811,85 @@ export function App() {
     notify(t('sign.disclaimer'));
   }, [notify, t]);
 
+  /* ── 数字签名 ─────────────────────────────────────────────────── */
+
+  const openSignDialog = useCallback(() => {
+    setSignTab('sign');
+    // 拿起对话框，就先放下页面上的放置模式，否则回来时两者同时 armed。
+    setMarkupTool((tool) => (tool === 'dsign' ? null : tool));
+    setDialog('digital-sign');
+  }, []);
+
+  /**
+   * 关闭对话框：× 按钮与 Esc 走同一条路（Esc 监听在 useDialogA11y 的 window 上）。
+   * 依赖表必须保持为空 —— 这个回调的标识就是那条监听的 key，一变每帧重挂。
+   * 放置模式现在由 dialog/markupTool 派生，这里清 markupTool 就够了。
+   */
+  const closeSignDialog = useCallback(() => {
+    setDialog(null);
+    // 顺手把 dsign 工具放下：对话框都没了还拿着它，页面层会一直盖着让页面点不动。
+    setMarkupTool((tool) => (tool === 'dsign' ? null : tool));
+  }, []);
+
+  const requestSignPlacement = useCallback(() => {
+    // 对话框让位给页面：坐标只能从真实页面上取，模态框挡着就没法点。
+    // 是「收起」而不是「关掉」—— 见 signPlacementMode 的说明。对话框留在
+    // 'digital-sign'，拿起 dsign 这支工具即等于进入收起态（派生值随之为 true）。
+    setMarkupTool('dsign');
+    notify(t('dsign.sign.placementHint'));
+  }, [notify, t]);
+
+  /** 签好了：后端把签好的文件读回内存（只读），界面随之换成那一份。 */
+  const handleSigned = useCallback(
+    (info: DocumentInfo) => {
+      pdf.applyDoc(info);
+      setSignPlacement(null);
+      setDialog(null);
+      notify(t('toast.signed', { name: fileStem(info.path) + '.pdf' }));
+    },
+    [notify, pdf, t]
+  );
+
+  /**
+   * 另存一份**剥离签名**的可编辑副本 —— 就是 Save As 到新路径，后端写副本时会去掉
+   * 增量签名并解除只读，所以这里不需要（也不该有）独立的第二套只读规则。
+   */
+  const saveEditableCopy = useCallback(async () => {
+    if (!pdf.doc) return;
+    const target = await pickSavePath(`${fileStem(pdf.doc.name)}-editable.pdf`);
+    if (!target) return;
+    const saved = await pdf.saveAs(target);
+    if (saved) notify(t('dsignReady.copyDone', { name: fileStem(saved) + '.pdf' }));
+  }, [notify, pdf, t]);
+
+  /**
+   * 签名前的落盘。后端 `SIGN_DIRTY_DOC` 是权威（磁盘字节必须与所签内容逐字节对应），
+   * 这里只是给它一条能走通的路：先原地保存，没有磁盘路径（或原地保存被拒）就另存为。
+   */
+  const saveBeforeSigning = useCallback(async (): Promise<boolean> => {
+    if (!pdf.doc) return false;
+    if (pdf.doc.dirty) {
+      const saved = pdf.doc.path ? await pdf.save() : null;
+      if (saved) return true;
+      const target = await pickSavePath(pdf.doc.name || 'document.pdf');
+      if (!target) return false;
+      return (await pdf.saveAs(target)) !== null;
+    }
+    return true;
+  }, [pdf]);
+
   const handlePageClick = useCallback(
     async (page: number, x: number, y: number) => {
+      if (signPlacementMode) {
+        // 认派生值而不是只认 `markupTool === 'dsign'`：对话框已经被别的入口换走时，
+        // 点页面不该把签名框请回来（用户已经不在签名流程里了）。
+        // 坐标取自真实页面（未旋转 PDF 点，与 sign_pdf 同一套映射），取完就把工具放下、
+        // 把对话框请回来 —— 用户要的是「点一下就能回去继续签」。
+        setSignPlacement({ page, x, y });
+        setMarkupTool(null);
+        setDialog('digital-sign');
+        return;
+      }
       if (markupTool === 'sign') {
         if (!sigPath) return;
         const info = await pdf.signature(page, x, y, 160, sigPath);
@@ -756,7 +899,7 @@ export function App() {
       }
       if (markupTool === 'note') setNoteAt({ page, x, y });
     },
-    [markupTool, notify, pdf, sigPath, t]
+    [markupTool, notify, pdf, signPlacementMode, sigPath, t]
   );
 
   const runSecurity = useCallback(
@@ -852,6 +995,8 @@ export function App() {
         onExportImages={exportImages}
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
+        onDigitalSign={openSignDialog}
+        signEngineAvailable={signEngine}
         onSecurity={() => setDialog('security')}
         onCompress={() => setDialog('compress')}
         onMarkdown={() => setDialog('markdown')}
@@ -929,6 +1074,7 @@ export function App() {
         error={pdf.error}
         selectedCount={pdf.selected.length}
         license={license}
+        onSaveEditableCopy={saveEditableCopy}
         onLicenseClick={() => {
           setDialog('license');
           refreshLicense();
@@ -991,6 +1137,27 @@ export function App() {
             notify(t('form.done'));
           }}
         />
+      ) : null}
+      {/* 数字签名对话框。两处挂载细节都是有意为之：
+          - key 按文档路径：对话框把 Certs/Sign 两页常驻挂载以保住输入，不换 key 的话
+            上一份文档的输出文件名与签署人姓名会残留到下一份文档上。
+          - 放置模式用 hidden 收起整块对话框而不是卸载，页面才能被点击，
+            而用户刚选的证书、写的姓名、挑的外观图片都还在。 */}
+      {dialog === 'digital-sign' && doc ? (
+        <div hidden={signPlacementMode}>
+          <SignDialog
+            key={doc.path}
+            doc={doc}
+            tab={signTab}
+            onTab={setSignTab}
+            placement={signPlacement}
+            engineAvailable={signEngine}
+            onRequestPlacement={requestSignPlacement}
+            onSaveFirst={saveBeforeSigning}
+            onSigned={handleSigned}
+            onClose={closeSignDialog}
+          />
+        </div>
       ) : null}
       {noteAt ? <NoteDialog onClose={() => setNoteAt(null)} onRun={applyNote} /> : null}
       {redactConfirm ? (

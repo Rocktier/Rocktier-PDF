@@ -40,6 +40,8 @@ const EXACT: Record<string, string> = {
   'missing %%EOF trailer': 'error.truncatedPdf',
   'ENCRYPTED_IN_PLACE_BLOCKED':
     'This document is password-protected; saving over it would remove the password, so it was refused.',
+  // 数字签名引擎没随包安装（`sign.rs::engine_path`）。整串就是这一个码，走精确匹配。
+  'SIGN_ENGINE_MISSING': 'error.signEngineMissing',
 };
 
 /** 归一化匹配：忽略大小写、标点与多余空白。 */
@@ -67,6 +69,22 @@ export function localizeError(raw: string, lookup: (key: string) => string): str
 
   // 许可相关错误码走专用文案（前端有专门的处理路径，不该被当成普通错误显示）。
   if (raw === 'LICENSE_EXPIRED' || raw === 'LICENSE_WRONG_PRODUCT') return raw;
+
+  /* 签名链路的错误码后面都跟着细节（`SIGNED_READ_ONLY: this file has…`），整串匹配
+     不上 EXACT，所以按前缀匹配。放在 EXACT 查询之前：这些前缀与任何精确键都不冲突，
+     顺序只影响可读性。
+     刻意**不**映射 `CERT_EXPIRED_CONFIRM|{cert_id}|{not_after}` —— 那是给界面用的
+     数据而不是文案：SignTabSign 要靠这段原始串解析出该确认哪张证书。在这里把它
+     本地化掉，过期证书确认流就断了（未知串走下面的原样回退，正是我们要的结果）。 */
+  if (raw.startsWith('SIGNED_READ_ONLY')) return lookup('error.signedReadOnly');
+  if (raw.startsWith('SIGN_DIRTY_DOC')) return lookup('error.signDirty');
+  if (raw.startsWith('SIGN_OUTPUT_IS_INPUT')) return lookup('error.signOutputIsInput');
+  if (raw.startsWith('SIGN_PAGE_OUT_OF_RANGE')) return lookup('error.signPageOutOfRange');
+  if (raw.startsWith('SIGN_KEY_MISSING')) return lookup('error.signKeyMissing');
+  if (raw.startsWith('SIGN_ENGINE_TIMEOUT')) return lookup('error.signEngineTimeout');
+  /* `SIGN_ENGINE_ERROR: exit N` 是引擎其余失败的统一出口（参数不合法、写不出文件等），
+     不映射的话中文界面会整段显示英文原文。细节跟在冒号后面，按前缀匹配。 */
+  if (raw.startsWith('SIGN_ENGINE_ERROR')) return lookup('error.signEngineError');
 
   const key = EXACT[raw] ?? NORMALIZED[normalize(raw)];
   if (!key) return raw; // 未知文案 → 原样显示底层真实错误（规范要求，不隐藏细节）

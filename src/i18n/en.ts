@@ -19,6 +19,7 @@ export const en = {
     exportImages: 'To images',
     imagesToPdf: 'Images to PDF',
     sign: 'Stamp',
+    digitalSign: 'Digital signature',
     security: 'Password protection',
     compress: 'Compress',
     fillForm: 'Fill form',
@@ -311,6 +312,8 @@ export const en = {
     noText: 'No text on the selected pages',
     exported: 'Exported {count} image(s)',
     imagesPdf: 'Created {name}',
+    // 破折号而不是冒号：见 dsignReady 上面对 family-check 取键正则的说明。
+    signed: 'Signed — {name}',
   },
 
   error: {
@@ -336,6 +339,17 @@ export const en = {
     noRedactRegions: 'Draw at least one area to redact.',
     notAPdf: 'That file is not a PDF.',
     truncatedPdf: 'That PDF looks truncated or damaged.',
+    /* 数字签名链路（services/errorText.ts 的 SIGN_* 前缀分支与 SIGN_ENGINE_MISSING）。
+       CERT_EXPIRED_CONFIRM 不在这里：那是 `码|证书|日期` 三段数据，界面自己解析，
+       本地化掉反而会断掉过期证书的确认流。 */
+    signEngineMissing: 'The signing engine is missing from this build.',
+    signedReadOnly: 'This file is signed and read-only. Save an editable copy first.',
+    signDirty: 'Save the document before signing.',
+    signOutputIsInput: 'Signing never overwrites the original file. Choose a new output path.',
+    signPageOutOfRange: 'That page does not exist.',
+    signKeyMissing: 'The private key for this certificate is missing. Re-import the certificate.',
+    signEngineTimeout: 'The signing engine did not respond in time. The original file is unchanged.',
+    signEngineError: 'The signing engine reported an error. The file is unchanged.',
   },
 
   privacy: {
@@ -355,6 +369,88 @@ export const en = {
       discard: "Don't save",
       cancel: 'Cancel',
     },
+  },
+
+  dsign: {
+    title: 'Digital signature',
+    close: 'Close',
+    tab: { certs: 'Certificates', sign: 'Sign', verify: 'Verify' },
+    engineMissing: 'The signing engine is missing from this build. Reinstall Rocktier PDF.',
+    cert: {
+      heading: 'Signing certificates',
+      intro:
+        'Certificates stay on this device. Private keys live in secure system storage: the Keychain on macOS, Credential Manager on Windows.',
+      namePlaceholder: 'Certificate name',
+      generate: 'Create self-signed',
+      importKey: 'Private key (.pem / .p12 / .pfx)',
+      importCert: 'Certificate (optional)',
+      password: 'Password',
+      preview: 'Check files',
+      import: 'Import',
+      setDefault: 'Use by default',
+      default: 'Default',
+      expired: 'Expired',
+      allowExpired: 'Use anyway',
+      delete: 'Delete',
+      deleteConfirm: 'Delete certificate "{name}"? Signatures already made with it stay valid, but you will not be able to sign with it again.',
+      empty: 'No certificates yet. Create a self-signed one, or import your own.',
+      issuer: 'Issuer',
+      validUntil: 'Valid until',
+      chain: 'Chain',
+      error: {
+        passwordRequired: 'This private key is password-protected. Enter the password.',
+        passwordWrong: 'Wrong password. Try again.',
+        keyMismatch: 'This private key does not match the certificate.',
+      },
+    },
+    sign: {
+      cert: 'Certificate',
+      signer: 'Signer name',
+      page: 'Signature position',
+      place: 'Choose position on page',
+      replacePlacement: 'Choose another position',
+      placementHint: 'Click the page to place the signature.',
+      placed: 'Position set: page {page}',
+      output: 'Output file',
+      appearance: 'Appearance image (optional)',
+      pickImage: 'Choose image…',
+      noImage: 'None — the signature stays invisible but valid',
+      submit: 'Sign',
+      dirty: 'Save your changes first — a signature must match the saved file byte for byte.',
+      saveFirst: 'Save now',
+      note: 'Signing creates a new file and opens it read-only.',
+      needPlacement: 'Choose a position on the page first.',
+      needCert: 'Select a certificate first.',
+      expiredConfirm: 'This certificate expired on {date}. Sign anyway?',
+    },
+    verify: {
+      run: 'Check signatures',
+      running: 'Checking…',
+      signer: 'Signer',
+      time: 'Signed at',
+      statusLabel: 'Status',
+      trusted: 'Trusted issuer',
+      yes: 'Yes',
+      no: 'No',
+      validNote: 'Every signature is valid and the document is unchanged since signing.',
+      untrustedNote:
+        'The signature is cryptographically valid, but the certificate is not issued by a trusted authority (self-signed or private CA).',
+      invalidNote:
+        'At least one signature failed verification. This usually means the document changed after it was signed.',
+      noneNote: 'This file contains no digital signatures.',
+      status: { valid: 'Valid', invalid: 'Invalid', untrusted: 'Valid, untrusted' },
+    },
+  },
+
+  /* 已签名文档的状态栏徽标与出路。文案属于「只读的结论」，规则本身在后端
+     （ensure_editable / SIGNED_READ_ONLY），界面只显示、不重述。
+     英文值里刻意用破折号而不是「冒号紧跟花括号占位符」：family-check 对 PDF 用
+     整文件正则取键（注释也扫），那种写法会被读成一个只在 en 出现的键，
+     en↔zh 对账直接 FAIL。 */
+  dsignReady: {
+    signed: 'Signed · read-only',
+    saveCopy: 'Save editable copy',
+    copyDone: 'Saved an editable copy without the signature — {name}',
   },
 };
 

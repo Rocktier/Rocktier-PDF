@@ -210,10 +210,12 @@ function Page({
     const h = Math.abs(drag.y1 - drag.y0);
     setDrag(null);
 
-    if (markupTool === 'note' || markupTool === 'sign') {
+    if (markupTool === 'note' || markupTool === 'sign' || markupTool === 'dsign') {
       // Notes and signatures are placed with a click, not a drag.
       if (w > 6 || h > 6) return;
       // Map the click from the rotated display box back to unrotated PDF coords.
+      // `p.x / p.y` 是未旋转的 PDF 点（左下原点），与后端 add_signature / sign_pdf
+      // 用的是同一套映射，所以旋转页不需要再换算 —— 数字签名放置模式复用这一支。
       const p = displayRectToPdf(left, top, 0, 0, cssWidth, cssHeight, page.rotation, page.width, page.height);
       onNoteAt(position, p.x, p.y);
       return;

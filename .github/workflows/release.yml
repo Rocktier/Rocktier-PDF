@@ -30,6 +30,11 @@ jobs:
           fi
           echo "activation key is configured"
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sign-engine/go.mod
+          cache-dependency-path: sign-engine/go.sum
+
       - uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy
@@ -37,6 +42,13 @@ jobs:
         run: |
           brew install qpdf
           bash scripts/provision-qpdf-macos.sh
+      - name: Go engine tests
+        working-directory: ./sign-engine
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Provision sign-engine sidecar
+        run: bash scripts/provision-sign-engine-macos.sh
       # tauri_build::build() hard-fails when a path in bundle.resources is missing,
       # and tauri.conf.json lists resources/qpdf. Without this the workflow dies at
       # cargo check - which is exactly how the v1.0.0 run failed.
@@ -84,6 +96,16 @@ jobs:
 
       - name: Install frontend deps
         run: npm ci
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sign-engine/go.mod
+          cache-dependency-path: sign-engine/go.sum
+
+      # 按 runner 原生架构构建：arm64 runner 出 arm64，Intel runner 出 x86_64。
+      # 不做 universal lipo —— 与主程序的分架构构建保持一致。
+      - name: Provision sign-engine sidecar
+        run: bash scripts/provision-sign-engine-macos.sh
 
       # Homebrew publishes no Intel bottle for qpdf, so the first Intel run
       # builds it from source (along with openssl@4 and jpeg-turbo). Cache the
@@ -182,6 +204,9 @@ jobs:
             echo "::notice::No Developer ID certificate configured - ad-hoc signing. Downloaded copies will still be flagged by Gatekeeper. See PRIVACY.md for the notarization secrets."
           fi
 
+          # --deep 会连带签 Contents/Resources/resources/sign-engine/sign-engine-macos，
+          # notarytool 提交的又是整个 DMG，嵌套可执行文件随包一起公证。**不要**为
+          # sidecar 单独提交公证 —— 单独提交产生的票据与主包无关，等于白做。
           codesign "${sign_app[@]}" -fv --deep "$app"
           codesign -dvvv "$app" 2>&1 | grep 'Signature=' || true
 
@@ -224,7 +249,16 @@ jobs:
           set -euo pipefail
           APP=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' | head -1)
           [ -z "$APP" ] && { echo "::error::.app not found"; exit 1; }
-          file "$APP/Contents/MacOS/"* | tee /dev/stderr | grep -q '${{ matrix.filearch }}'
+          # -b 是必须的：file 默认把**路径**一起打出来，而 x86_64 那一路的
+          # target 目录本身就是 x86_64-apple-darwin —— 带上路径时 grep 'x86_64'
+          # 匹配到的是目录名，架构错了也会空过。arm64 那一路恰好不重合，
+          # 所以这个洞只会漏掉 Intel 包。
+          file -b "$APP/Contents/MacOS/"* | tee /dev/stderr | grep -q '${{ matrix.filearch }}'
+          # 每个安装包都在**自己的**原生架构 runner 上出，所以 sidecar 的资源名
+          # 不带架构后缀；架构对不对只能在这里断言，断言失败就是打包矩阵串了。
+          ENGINE=$(find "$APP" -name 'sign-engine-macos' -type f | head -1)
+          [ -z "$ENGINE" ] && { echo "::error::sign-engine-macos missing from the bundle"; exit 1; }
+          file -b "$ENGINE" | tee /dev/stderr | grep -q '${{ matrix.filearch }}'
 
       - uses: actions/upload-artifact@v4
         with:
@@ -253,6 +287,15 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sign-engine/go.mod
+          cache-dependency-path: sign-engine/go.sum
+
+      - name: Provision sign-engine sidecar
+        shell: pwsh
+        run: pwsh -ExecutionPolicy Bypass -File scripts/provision-sign-engine-windows.ps1
+
       - name: Provision qpdf sidecar
         # pwsh, not powershell: Windows PowerShell 5.1 reads a BOM-less UTF-8 .ps1
         # as the system codepage, so the Chinese comments swallow the bytes that
@@ -266,6 +309,15 @@ jobs:
       # cargo check - which is exactly how the v1.0.0 run failed.
       - name: Build
         run: npm run tauri:build
+
+      - name: Verify sign-engine sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENGINE=$(find src-tauri/resources/sign-engine -name 'sign-engine-windows.exe' -type f | head -1)
+          [ -z "$ENGINE" ] && { echo "::error::sign-engine-windows.exe was not built"; exit 1; }
+          file "$ENGINE" | tee /dev/stderr | grep -q 'PE32+'
+          file "$ENGINE" | grep -q 'x86-64'
 
       # 去掉 MSI 文件名里的 _en-US（Tauri v2 会按 bundle.windows.wix.language 追加）。
       # 应用本身带语言切换器，文件名宣称单一语言会误导 —— 看起来像存在

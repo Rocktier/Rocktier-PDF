@@ -11,6 +11,7 @@ import type {
   RedactOutcome,
   RedactRegion,
   RenderedPage,
+  SaveResult,
   SearchHit,
   SplitMode,
   StampKind,
@@ -49,8 +50,8 @@ export async function movePage(from: number, to: number): Promise<DocumentInfo> 
   return invoke<DocumentInfo>('move_page', { from, to });
 }
 
-export async function saveDocument(path: string | null): Promise<PathResult> {
-  return invoke<PathResult>('save_document', { path });
+export async function saveDocument(path: string | null): Promise<SaveResult> {
+  return invoke<SaveResult>('save_document', { path });
 }
 
 /** Write the selected pages out as a brand new PDF; leaves the current doc untouched. */

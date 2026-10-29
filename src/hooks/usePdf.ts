@@ -25,6 +25,7 @@ import type {
   MarkupRect,
   RedactOutcome,
   RedactRegion,
+  SaveResult,
   SplitMode,
   StampKind,
 } from '../types';
@@ -76,7 +77,7 @@ export function usePdf() {
   }, []);
 
   /** Keep the header in sync after the file was written under a new path. */
-  const adoptSaved = useCallback((result: { path: string; size: number }) => {
+  const adoptSaved = useCallback((result: SaveResult) => {
     setDoc((prev) =>
       prev
         ? {
@@ -85,6 +86,9 @@ export function usePdf() {
             name: `${fileStem(result.path)}.pdf`,
             fileSize: result.size,
             dirty: false,
+            // 另存可编辑副本会剥掉签名，后端据此把只读解除；原地保存保持原状。
+            readOnly: result.readOnly,
+            hasCryptographicSignature: result.readOnly,
           }
         : prev
     );

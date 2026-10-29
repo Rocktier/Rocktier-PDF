@@ -929,3 +929,53 @@
   color: var(--danger);
 }
 
+
+/* ── 数字签名对话框（证书列表 / 验签表格）────────────────────────── */
+
+/* 错误提示：全局此前只有 .toast.error 与 .statusbar .status-dot.error，
+   对话框里 <p className="error"> 一直没有对应的颜色。这里补上文字色，
+   顺带让既有的压缩/授权对话框错误也变成红色（只改颜色，不改布局）。
+   注意：不在此处设 margin，避免影响既有 <p> 的默认外边距；
+   签名对话框的错误元素各自控制间距（<p> 用内联 margin，<div> 本身无默认边距）。 */
+.error {
+  color: var(--danger);
+}
+
+.cert-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cert-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cert-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.verify-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.verify-table th,
+.verify-table td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}

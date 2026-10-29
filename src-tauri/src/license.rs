@@ -83,7 +83,10 @@ pub const PUBLIC_KEY_B64: &str = "jIw3pZntprv6umUr4wFBz838/U4VvxRBHvLK08nri4M=";
 /// ⚠️ 官网价格表 `rocktier.com/api/_shared.js` 已同步改为 `PD`。**两处必须同批改**——
 /// 只改一处会导致新买家付款后拿到 `PD` 回执而应用只认 `SQ`（或反之），等于全员激活失败。
 /// `FL` = 全家桶。
-pub const ACCEPTED_PRODUCTS: [&str; 2] = ["PD", "FL"];
+///
+/// `SG` = Rocktier Sign 的单品码。2026-10-28 Sign 并入 PDF：SG 回执等同 PD，
+/// 老用户得到完整 PDF；签名能力不额外收费，因此不需要新的产品码。
+pub const ACCEPTED_PRODUCTS: [&str; 3] = ["PD", "SG", "FL"];
 
 /// 这份回执是否属于本应用可接受的授权。
 pub fn accepts(receipt: &Receipt) -> bool {
@@ -414,6 +417,9 @@ mod tests {
         };
         assert!(accepts(&make("PD")), "本单品的码必须接受");
         assert!(accepts(&make("FL")), "全家桶的码必须接受");
+        // 2026-10-28 Sign 并入 PDF：Sign 的老用户手里是 SG 回执，必须同样放行，
+        // 否则他们「付过钱却激活失败」。
+        assert!(accepts(&make("SG")), "Sign 的单品码必须接受（并入后等同 PD）");
         for other in ["WP", "MD", "CV"] {
             assert!(
                 !accepts(&make(other)),

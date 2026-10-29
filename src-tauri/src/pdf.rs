@@ -44,10 +44,13 @@ pub struct DocumentInfo {
     pub file_size: u64,
     pub dirty: bool,
     pub pages: Vec<PageInfo>,
-    /// 恒为 `false`：本产品放置的签名是**视觉图片图章**，不是密码学数字签名
-    /// （P0-15）。字段随文档状态上报给前端，供界面如实声明，绝不能在签名功能
-    /// 真正做数字签名之前翻转成 `true`。
+    /// 由签名探测决定：只要磁盘上的文件带密码学签名就为 `true`。
+    ///
+    /// 界面据此如实声明「这份文件有签名」，并把它当作只读文档处理（P0-15 时期
+    /// 恒为 `false`，因为那时只有视觉图章；现在有真签名了）。
     pub has_cryptographic_signature: bool,
+    /// 已签名文件以只读方式打开：签名是对字节的承诺，整份重写等于作废。
+    pub read_only: bool,
 }
 
 #[derive(Serialize)]
@@ -64,6 +67,16 @@ pub struct RenderedPage {
 pub struct PathResult {
     pub path: String,
     pub size: u64,
+}
+
+/// 保存结果。`read_only` 让前端知道「这次写出是否已经把只读状态解除」——
+/// 另存可编辑副本后必须立刻恢复编辑能力，否则用户永远卡在只读。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveResult {
+    pub path: String,
+    pub size: u64,
+    pub read_only: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -179,7 +192,12 @@ pub fn page_infos(doc: &PdfDocument) -> Result<Vec<PageInfo>, String> {
     Ok(out)
 }
 
-pub fn doc_info(doc: &PdfDocument, path: &str, dirty: bool) -> Result<DocumentInfo, String> {
+pub fn doc_info(
+    doc: &PdfDocument,
+    path: &str,
+    dirty: bool,
+    read_only: bool,
+) -> Result<DocumentInfo, String> {
     let name = PathBuf::from(path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -194,7 +212,8 @@ pub fn doc_info(doc: &PdfDocument, path: &str, dirty: bool) -> Result<DocumentIn
         file_size,
         dirty,
         pages: page_infos(doc)?,
-        has_cryptographic_signature: false,
+        has_cryptographic_signature: read_only,
+        read_only,
     })
 }
 

@@ -53,6 +53,10 @@ interface ToolbarProps {
   onExportImages: () => void;
   onImagesToPdf: () => void;
   onSign: () => void;
+  /** 数字签名（密码学）—— 与上面那个图片印章是两回事。 */
+  onDigitalSign: () => void;
+  /** 签名引擎在不在包里：不在就禁用入口，并在 title 里说明原因。 */
+  signEngineAvailable: boolean;
   onSecurity: () => void;
   onCompress: () => void;
   onMarkdown: () => void;
@@ -88,6 +92,8 @@ export function Toolbar({
   onExportImages,
   onImagesToPdf,
   onSign,
+  onDigitalSign,
+  signEngineAvailable,
   onSecurity,
   onCompress,
   onMarkdown,
@@ -131,7 +137,14 @@ export function Toolbar({
         {t('toolbar.open')}
       </button>
 
-      <button className="btn" onClick={onSave} disabled={!doc || busy}>
+      {/* 只读（已签名）文档原地保存必然被后端 SIGNED_READ_ONLY 拒掉，
+          所以这里禁用；「另存为」保持可用 —— 那正是取可编辑副本的合法路径。 */}
+      <button
+        className="btn"
+        onClick={onSave}
+        disabled={!doc || busy || doc.readOnly}
+        title={doc?.readOnly ? t('error.signedReadOnly') : undefined}
+      >
         <IconSave />
         {t('toolbar.save')}
       </button>
@@ -250,6 +263,17 @@ export function Toolbar({
         // P0-15：功能入口处如实声明这是视觉图章，不是数字签名。
         title={t('sign.tooltip')}
         aria-label={t('toolbar.sign')}
+      >
+        <IconSign />
+      </button>
+      {/* 数字签名（真密码学签名，走签名引擎）。引擎不在安装包里没有可用路径，
+          所以入口直接禁用，并把原因写进 title —— 给用户一个注定失败的按钮更糟。 */}
+      <button
+        className="btn btn-icon"
+        onClick={onDigitalSign}
+        disabled={!doc || busy || !signEngineAvailable}
+        title={signEngineAvailable ? t('toolbar.digitalSign') : t('dsign.engineMissing')}
+        aria-label={t('toolbar.digitalSign')}
       >
         <IconSign />
       </button>

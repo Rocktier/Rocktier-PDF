@@ -2,7 +2,8 @@ name: Checks
 
 # Editor 此前**没有任何 CI**（合并前它一直靠手动跑）。压缩能力并进来之后，
 # 两条写文件路径（pdfium / qpdf）同处一个应用，没有自动化检查是不可接受的。
-# 规格对齐 Squeeze 的 ci.yml：前端类型检查 + Rust 测试 + clippy -D warnings。
+# 数字签名并入后，Go 引擎也进同一条流水线：引擎与 Rust 的契约（退出码、
+# JSON 字段）改坏了，必须在合并前就红。
 
 on:
   push:
@@ -24,12 +25,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy
+      # go.mod 的 `go` 指令就是版本来源；不用手写版本号，避免两处漂移。
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sign-engine/go.mod
+          cache-dependency-path: sign-engine/go.sum
       - name: Install qpdf + frontend deps
         run: |
           brew install qpdf
           npm ci
       - name: Provision qpdf sidecar
         run: bash scripts/provision-qpdf-macos.sh
+      - name: Go vet & tests
+        working-directory: ./sign-engine
+        run: |
+          go vet ./...
+          go test ./...
+      # tauri_build 会在 bundle.resources 缺文件时硬失败；先构建 sidecar，
+      # 后面的 cargo test / clippy 才走得通。
+      - name: Provision sign-engine sidecar
+        run: bash scripts/provision-sign-engine-macos.sh
       - name: Frontend typecheck
         run: npx tsc --noEmit
       - name: Rust tests

@@ -21,6 +21,8 @@ mod pdf;
 // PDF → Markdown：取字符与调度（结构推断在 mdconv）
 mod pdf_to_md;
 mod security;
+// 数字签名：sidecar 编排、证书库、系统钥匙串（见 sign.rs 模块说明）。
+mod sign;
 mod state;
 
 use std::sync::Mutex;
@@ -421,6 +423,9 @@ fn main() {
             if let Ok(dir) = app.path().app_data_dir() {
                 commands::init_license_dir(dir);
             }
+            // Sign 并入 PDF：把老用户的回执 / 证书 / 私钥复制过来。
+            // 只跑一次（标记文件），只复制、只读旧目录 —— 见 sign.rs 的 migrate_*。
+            crate::sign::migrate_from_sign(app.handle());
             commands::init_app_handle(app.handle().clone());
             // 双击关联文件启动时（Windows/Linux）路径在 argv 里，先缓冲起来。
             app.manage(InitialFile(Mutex::new(file_from_args())));
@@ -473,11 +478,23 @@ fn main() {
             commands::report_machine_fingerprint,
             commands::store_receipt,
             commands::clear_receipt,
+            // 数字签名：签名页 / 证书页 / 验证页（T7 按这些名字调用）。
+            commands::sign_capabilities,
+            commands::list_certs,
+            commands::get_default_cert,
+            commands::set_default_cert,
+            commands::allow_expired_cert,
+            commands::delete_cert,
+            commands::inspect_cert_files,
+            commands::import_cert,
+            commands::generate_key,
+            commands::sign_pdf,
+            commands::verify_pdf,
             build_menu,
             initial_file,
             open_url,
-        
-            commands::compress_document,])
+            commands::compress_document,
+        ])
         .on_menu_event(|app, event| {
             // Windows 真全屏（替代 muda 在 Win 上无效的 PredefinedMenuItem::fullscreen）
             if event.id().0.as_str() == "win-fullscreen" {
