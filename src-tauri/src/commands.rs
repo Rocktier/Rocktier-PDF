@@ -1783,8 +1783,8 @@ pub async fn sign_pdf(
     }
     // 输出路径上如果已经有文件，失败清理就不能碰它 —— 那不是这次签名的产物。
     let output_pre_existed = std::fs::metadata(&output).map(|m| m.is_file()).unwrap_or(false);
-    // `page` 是 1 起步的用户页码；先挡 0/negative 不可能（u32），再挡超出末页。
-    if page < 1 || page as usize > total_pages {
+    // `page` 是 1 起步的用户页码；pdfium 的 pages().len() 是 i32，故右边先夹到非负再转 u32。
+    if page == 0 || page > total_pages.max(0) as u32 {
         return Err(format!("SIGN_PAGE_OUT_OF_RANGE: page {page} does not exist"));
     }
 
