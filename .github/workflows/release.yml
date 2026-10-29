@@ -316,8 +316,12 @@ jobs:
           set -euo pipefail
           ENGINE=$(find src-tauri/resources/sign-engine -name 'sign-engine-windows.exe' -type f | head -1)
           [ -z "$ENGINE" ] && { echo "::error::sign-engine-windows.exe was not built"; exit 1; }
-          file "$ENGINE" | tee /dev/stderr | grep -q 'PE32+'
-          file "$ENGINE" | grep -q 'x86-64'
+          # 不能用 `| tee /dev/stderr`：Git Bash（Windows runner）没有 /dev/stderr，
+          # tee 报错叠加 pipefail 会让本该通过的验证判红 —— 2026-10-29 v1.1.0 首次发版就这么栽的。
+          OUTPUT=$(file "$ENGINE")
+          echo "$OUTPUT"
+          printf '%s\n' "$OUTPUT" | grep -q 'PE32+'
+          printf '%s\n' "$OUTPUT" | grep -q 'x86-64'
 
       # 去掉 MSI 文件名里的 _en-US（Tauri v2 会按 bundle.windows.wix.language 追加）。
       # 应用本身带语言切换器，文件名宣称单一语言会误导 —— 看起来像存在
