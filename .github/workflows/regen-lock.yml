@@ -1,0 +1,41 @@
+name: Regen Cargo.lock
+
+# 为什么需要：`src-tauri/Cargo.lock` 停在 1.0.30 且没有 keyring 条目（2026-10-29 发布后实测
+# `Cargo.lock:3025` 与 `Cargo.toml:42` 不一致）。本机零 Rust 是硬约束，所以这一步由 CI 代跑。
+#
+# 为什么用 `cargo metadata` 而不是 `cargo generate-lockfile`：后者会把所有依赖重解析到最新，
+# 等于顺手升级整棵树，与「只补上缺失条目」的目标不符。metadata 会解析并写回锁文件，
+# 已锁定的版本原样保留，新增的（keyring 一棵子树）与包版本（1.1.0）才变。
+#
+# 为什么产物只上传 artifact、不让 workflow 直接推 main：锁文件决定发版构建的实际依赖，
+# 必须有人看过 diff 再提交。
+#
+# 用法：Actions → Regen Cargo.lock → Run workflow，然后
+#   gh run download <run-id> -n Cargo.lock -D /tmp/lock
+# 把 /tmp/lock/Cargo.lock 复制回 src-tauri/，`git diff --stat` 核对后提交。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  regen:
+    name: Resolve lockfile
+    # 与 Checks 同平台：keyring 的 apple-native 后端只在 macOS 上落地，锁文件虽与目标无关，
+    # 但解析路径一致能少一类「本地能解析、CI 报缺」的意外。
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - name: Resolve and show diff
+        working-directory: src-tauri
+        run: |
+          cp Cargo.lock Cargo.lock.before
+          cargo metadata --format-version 1 > /dev/null
+          echo "--- Cargo.lock diff (before → after) ---"
+          diff -u Cargo.lock.before Cargo.lock || true
+          rm Cargo.lock.before
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cargo.lock
+          path: src-tauri/Cargo.lock
+          if-no-files-found: error
