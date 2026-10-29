@@ -925,20 +925,26 @@ mod tests {
     /// 这条断言在修复前是红的（那时没有这个判定，keys_failed 不影响返回值）。
     #[test]
     fn migration_is_incomplete_while_any_key_failed() {
-        let mut ok = MigrationReport::default();
-        ok.keys_copied = 2;
+        let ok = MigrationReport {
+            keys_copied: 2,
+            ..Default::default()
+        };
         assert!(migration_complete(&ok), "私钥全迁完就该算跑完");
 
-        let mut partial = MigrationReport::default();
-        partial.keys_copied = 1;
-        partial.keys_failed = 1;
+        let partial = MigrationReport {
+            keys_copied: 1,
+            keys_failed: 1,
+            ..Default::default()
+        };
         assert!(
             !migration_complete(&partial),
             "还有私钥没迁完就不许写标记 —— 否则失败永不重试"
         );
 
-        let mut none = MigrationReport::default();
-        none.keys_failed = 3;
+        let none = MigrationReport {
+            keys_failed: 3,
+            ..Default::default()
+        };
         assert!(!migration_complete(&none), "一张都没迁成更不能算跑完");
 
         // 没有证书、也就没有私钥要迁的空迁移，应当算跑完（不该每次启动都重跑）。
