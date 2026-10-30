@@ -66,7 +66,7 @@ export const en = {
     title: 'Merge PDFs',
     add: 'Add files',
     empty: 'No files added yet.',
-    hint: 'Pages are appended in the order shown. Drag is coming in v0.2.',
+    hint: 'Pages are appended in the order added. To change it, remove a file and add it again.',
     output: 'Save as',
     cancel: 'Cancel',
     run: 'Merge',

@@ -256,16 +256,6 @@ export function Toolbar({
       >
         <IconImagesToPdf />
       </button>
-      <button
-        className={`btn btn-icon${markupTool === 'sign' ? ' active' : ''}`}
-        onClick={onSign}
-        disabled={!doc || busy}
-        // P0-15：功能入口处如实声明这是视觉图章，不是数字签名。
-        title={t('sign.tooltip')}
-        aria-label={t('toolbar.sign')}
-      >
-        <IconSign />
-      </button>
       {/* 数字签名（真密码学签名，走签名引擎）。引擎不在安装包里没有可用路径，
           所以入口直接禁用，并把原因写进 title —— 给用户一个注定失败的按钮更糟。 */}
       <button
@@ -342,6 +332,19 @@ export function Toolbar({
         aria-label={t('markup.note')}
       >
         <IconNote />
+      </button>
+      {/* 图片印章（视觉图章，不是密码学签名）。曾与数字签名相邻且共用 IconSign，
+          用户分不清；它本质是标记工具（markupTool === 'sign'），所以归到标记组，
+          数字签名留在加密工具组。图标仍复用 IconSign，但周边全是标记类按钮，
+          含义由分组决定。 */}
+      <button
+        className={`btn btn-icon${markupTool === 'sign' ? ' active' : ''}`}
+        onClick={onSign}
+        disabled={!doc || busy}
+        title={t('sign.tooltip')}
+        aria-label={t('toolbar.sign')}
+      >
+        <IconSign />
       </button>
       <button
         className={`btn btn-icon${redactActive ? ' active btn-danger' : ''}`}

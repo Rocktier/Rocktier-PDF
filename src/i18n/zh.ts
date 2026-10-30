@@ -68,7 +68,7 @@ export const zh: Strings = {
     title: '合并 PDF',
     add: '添加文件',
     empty: '还没有添加文件。',
-    hint: '按显示顺序追加页面。拖拽排序将在 v0.2 提供。',
+    hint: '按添加顺序追加页面。顺序不对就删掉那一份重新添加。',
     output: '另存为',
     cancel: '取消',
     run: '合并',
