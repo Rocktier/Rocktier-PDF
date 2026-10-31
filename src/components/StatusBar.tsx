@@ -8,14 +8,28 @@ interface StatusBarProps {
   busy: boolean;
   error: string | null;
   selectedCount: number;
+  /** 当前可见页（0 起）与缩放：状态栏只说真实值。 */
+  current: number;
+  zoom: number;
   /** 许可状态：用于显示试用剩余天数、以及作为进入"许可与激活"的入口。 */
   license?: LicenseInfo | null;
   onLicenseClick?: () => void;
-  /** 已签名（只读）文档：另存一份剥离签名的可编辑副本。 */
-  onSaveEditableCopy: () => void;
 }
 
-export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseClick, onSaveEditableCopy }: StatusBarProps) {
+/**
+ * 状态栏：进行中才放呼吸红点，旁边永远有文字；静止态只有一个中性文字。
+ * 右侧是真实的页码、缩放、文件大小，不编造版本或页数。
+ */
+export function StatusBar({
+  doc,
+  busy,
+  error,
+  selectedCount,
+  current,
+  zoom,
+  license,
+  onLicenseClick,
+}: StatusBarProps) {
   const t = useT();
 
   /* 只在直链版且尚未买断时提示 —— 商店版由商店收款，这里再提一句"试用/购买"既多余，
@@ -23,7 +37,6 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
   const showLicenseChip =
     !!license && license.channel === 'direct' && license.status !== 'licensed';
 
-  const state = error ? 'error' : busy ? 'busy' : 'ready';
   // Rust 把错误拍平为英文原文返回；这里做一层映射，转成当前语言的措辞。
   // 查不到映射时回退原文 —— 规范要求失败时展示底层真实错误文本，不隐藏细节。
   const label = error
@@ -32,50 +45,30 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
       ? t('status.working')
       : t('status.ready');
 
+  const page = doc ? Math.min(Math.max(current + 1, 1), doc.pageCount) : 0;
+
   return (
     <div className="statusbar" role="status" aria-live="polite">
-      <span className={`status-dot ${state}`} />
-      <span>{label}</span>
+      {busy ? <span className="dot-live" aria-hidden="true" /> : null}
+      <span className={error ? 'status-text error' : 'status-text'}>{label}</span>
 
-      {doc ? (
-        <>
-          <span className="sep">|</span>
-          <span>{doc.name}</span>
-          <span className="sep">|</span>
-          <span>
-            {doc.pageCount} {t('status.pages')}
-          </span>
-          <span className="sep">|</span>
-          <span>{formatBytes(doc.fileSize)}</span>
-          {selectedCount > 0 ? (
-            <>
-              <span className="sep">|</span>
-              <span>
-                {selectedCount} {t('rail.page')}
-              </span>
-            </>
-          ) : null}
-          {doc.dirty ? (
-            <>
-              <span className="sep">|</span>
-              <span style={{ color: 'var(--warn)' }}>{t('status.unsaved')}</span>
-            </>
-          ) : null}
-          {/* 只读徽标：规则由后端裁定（ensure_editable / SIGNED_READ_ONLY），这里只是
-              把它的结论显示出来，并给出唯一的合法出路 —— 另存剥离签名的副本。 */}
-          {doc.readOnly ? (
-            <>
-              <span className="sep">|</span>
-              <span style={{ color: 'var(--warn)' }}>{t('dsignReady.signed')}</span>
-              <button type="button" className="license-chip" onClick={onSaveEditableCopy}>
-                {t('dsignReady.saveCopy')}
-              </button>
-            </>
-          ) : null}
-        </>
+      {doc?.dirty ? <span className="status-text warn">{t('status.unsaved')}</span> : null}
+      {doc?.readOnly ? <span className="status-text warn">{t('dsignReady.signed')}</span> : null}
+      {selectedCount > 0 ? (
+        <span className="status-meta">
+          {selectedCount} {t('rail.page')}
+        </span>
       ) : null}
 
-      <div style={{ flex: 1 }} />
+      <span className="statusbar-spacer" />
+
+      {doc ? (
+        <span className="statusbar-meta">
+          {t('status.pageOf', { page, total: doc.pageCount })} · {Math.round(zoom * 100)}% ·{' '}
+          {formatBytes(doc.fileSize)}
+        </span>
+      ) : null}
+
       {showLicenseChip ? (
         <button type="button" className="badge-license" onClick={onLicenseClick}>
           {license.status === 'expired'
@@ -83,7 +76,7 @@ export function StatusBar({ doc, busy, error, selectedCount, license, onLicenseC
             : t('license.trialChip', { days: license.daysLeft })}
         </button>
       ) : null}
-      <span>{t('privacy.badge')}</span>
+      <span className="status-meta">{t('privacy.badge')}</span>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { DropZone } from './components/DropZone';
 import { FindBar } from './components/FindBar';
 import { FormDialog } from './components/FormDialog';
+import { Inspector } from './components/Inspector';
 import { MergeDialog } from './components/MergeDialog';
 import { NoteDialog } from './components/NoteDialog';
 import { PageViewer } from './components/PageViewer';
@@ -820,6 +821,13 @@ export function App() {
     setDialog('digital-sign');
   }, []);
 
+  /** 检查器里的「验证签名」入口：同一个对话框，直接落在验证页。 */
+  const openVerifyDialog = useCallback(() => {
+    setSignTab('verify');
+    setMarkupTool((tool) => (tool === 'dsign' ? null : tool));
+    setDialog('digital-sign');
+  }, []);
+
   /**
    * 关闭对话框：× 按钮与 Esc 走同一条路（Esc 监听在 useDialogA11y 的 window 上）。
    * 依赖表必须保持为空 —— 这个回调的标识就是那条监听的 key，一变每帧重挂。
@@ -977,7 +985,6 @@ export function App() {
       <Toolbar
         doc={doc}
         busy={pdf.busy}
-        selectedCount={pdf.selected.length}
         zoom={zoom}
         theme={theme}
         markupTool={markupTool}
@@ -989,8 +996,6 @@ export function App() {
         onSaveAs={saveAs}
         onMerge={() => setDialog('merge')}
         onSplit={() => setDialog('split')}
-        onExtract={extractSelected}
-        onCopyText={copySelectedText}
         onStamp={() => setDialog('stamp')}
         onExportImages={exportImages}
         onImagesToPdf={runImagesToPdf}
@@ -1004,7 +1009,9 @@ export function App() {
         onUndo={() => void pdf.stepHistory('undo')}
         onRedo={() => void pdf.stepHistory('redo')}
         onRotate={rotateSelected}
-        onDelete={removeSelected}
+        onFind={() => {
+          if (doc) setFindOpen(true);
+        }}
         onZoom={setZoom}
         onToggleTheme={cycleTheme}
       />
@@ -1060,6 +1067,26 @@ export function App() {
               />
             ) : null}
           </div>
+          <Inspector
+            doc={doc}
+            current={current}
+            selectedCount={pdf.selected.length}
+            busy={pdf.busy}
+            signEngineAvailable={signEngine}
+            onSign={openSignDialog}
+            onVerify={openVerifyDialog}
+            onSaveEditableCopy={saveEditableCopy}
+            onDelete={removeSelected}
+            onExtract={extractSelected}
+            onCopyText={copySelectedText}
+            onCompress={() => setDialog('compress')}
+            onSecurity={() => setDialog('security')}
+            onForm={() => setDialog('form')}
+            onMarkdown={() => setDialog('markdown')}
+            onStamp={() => setDialog('stamp')}
+            onExportImages={exportImages}
+            onImagesToPdf={runImagesToPdf}
+          />
         </main>
       ) : (
         /* 空态同样是主内容，包 main 让"有无文档"两种状态都恰好有一个 main 地标（D-78） */
@@ -1079,8 +1106,9 @@ export function App() {
         busy={pdf.busy}
         error={pdf.error}
         selectedCount={pdf.selected.length}
+        current={current}
+        zoom={zoom}
         license={license}
-        onSaveEditableCopy={saveEditableCopy}
         onLicenseClick={() => {
           setDialog('license');
           refreshLicense();

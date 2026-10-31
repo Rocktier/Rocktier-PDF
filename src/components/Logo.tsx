@@ -237,6 +237,23 @@ export const IconPlus = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+/** 查找：放大镜。搜索框在阅读区浮出，这里只是它的固定入口。 */
+export const IconSearch = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <circle cx="7" cy="7" r="4.2" />
+    <path d="M10.2 10.2 13.5 13.5" />
+  </svg>
+);
+
+/** 更多：三点横排。低频工具收进这里，不占一条图标带。 */
+export const IconMore = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <circle cx="3.2" cy="8" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="8" cy="8" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="12.8" cy="8" r="0.9" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const IconMinus = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <path d="M3 8h10" />
