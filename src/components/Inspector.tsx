@@ -129,7 +129,12 @@ export function Inspector({
               {t('inspector.verify')}
             </button>
             {doc.readOnly ? (
-              <button type="button" className="btn btn-sm" onClick={onSaveEditableCopy}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={onSaveEditableCopy}
+                disabled={busy}
+              >
                 {t('dsignReady.saveCopy')}
               </button>
             ) : null}

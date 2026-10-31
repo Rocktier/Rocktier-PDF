@@ -28,6 +28,9 @@ export const en = {
     extractPages: 'Extract pages',
     undo: 'Undo',
     redo: 'Redo',
+    toolsLabel: 'Tools',
+    find: 'Find',
+    more: 'More',
   },
 
   // 主题按钮三态文案（家族 §6.5）。title = 「Theme · Follow system」
@@ -60,6 +63,30 @@ export const en = {
     unsaved: 'Unsaved changes',
     saved: 'Saved',
     pages: 'pages',
+    pageOf: 'Page {page} of {total}',
+  },
+
+  inspector: {
+    label: 'Document inspector',
+    document: 'Document',
+    pages: 'Pages',
+    size: 'File size',
+    pageSize: 'Current page',
+    state: 'State',
+    readOnly: 'Read-only',
+    editable: 'Editable',
+    signature: 'Digital signature',
+    signedBadge: 'Signed',
+    unsignedBadge: 'Unsigned',
+    signedBody: 'A cryptographic signature is attached. Editing the document will break it.',
+    unsignedBody: 'No cryptographic signature attached.',
+    sign: 'Sign',
+    verify: 'Verify',
+    offlineNote: 'Signing and verification run entirely on this device.',
+    selection: 'Selection',
+    selectionCount: '{count} selected',
+    noSelection: 'Select pages in the thumbnail rail.',
+    tools: 'Tools',
   },
 
   merge: {

@@ -30,6 +30,9 @@ export const zh: Strings = {
     extractPages: '提取页面',
     undo: '撤销',
     redo: '重做',
+    toolsLabel: '工具',
+    find: '查找',
+    more: '更多',
   },
 
   // 主题按钮三态文案（家族 §6.5）
@@ -62,6 +65,30 @@ export const zh: Strings = {
     unsaved: '未保存的修改',
     saved: '已保存',
     pages: '页',
+    pageOf: '第 {page} / {total} 页',
+  },
+
+  inspector: {
+    label: '文档检查器',
+    document: '文档',
+    pages: '页数',
+    size: '文件大小',
+    pageSize: '当前页尺寸',
+    state: '状态',
+    readOnly: '只读',
+    editable: '可编辑',
+    signature: '数字签名',
+    signedBadge: '已签名',
+    unsignedBadge: '未签名',
+    signedBody: '已附带加密签名。修改文档会使签名失效。',
+    unsignedBody: '未附带加密签名。',
+    sign: '签名',
+    verify: '验证',
+    offlineNote: '签名与验证都在本机完成。',
+    selection: '选区',
+    selectionCount: '已选 {count} 页',
+    noSelection: '在缩略图栏选择页面。',
+    tools: '工具',
   },
 
   merge: {

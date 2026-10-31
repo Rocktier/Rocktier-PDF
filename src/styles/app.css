@@ -641,33 +641,6 @@
   flex-shrink: 0;
 }
 
-.statusbar .sep {
-  /* --border-hover 是描边令牌(1.44~1.52:1)，不能当文字色用 */
-  color: var(--text-tertiary);
-}
-
-.statusbar .status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--success);
-  flex-shrink: 0;
-}
-
-.statusbar .status-dot.busy {
-  background: var(--warn);
-  animation: pulse 3s ease-in-out infinite;
-}
-
-.statusbar .status-dot.error {
-  background: var(--danger);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
 /* ── Modal ────────────────────────────────────────────────────── */
 .overlay {
   position: fixed;
@@ -1440,6 +1413,12 @@
 /* 未保存 / 已签名只读：警示文字走 --warn（两档都按 AA 取值） */
 .status-text.warn {
   color: var(--warn);
+  flex: none;
+}
+
+/* 失败：与就绪/进行中必须可区分，文字用两档都 ≥4.5:1 的 --red-ink */
+.status-text.error {
+  color: var(--red-ink);
   flex: none;
 }
 
