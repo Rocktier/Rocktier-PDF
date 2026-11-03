@@ -464,7 +464,8 @@ export function App() {
         void openFile();
       } else if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        void save();
+        // ⇧ 必须分流：此前 ⌘⇧S 走的也是保存，覆盖当前文件 —— 用户以为在「另存为」
+        void (e.shiftKey ? saveAs() : save());
       } else if (mod && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         if (pdf.doc) setFindOpen(true);
