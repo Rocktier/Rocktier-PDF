@@ -51,6 +51,7 @@ export const zh: Strings = {
     hint: '或按 Ctrl/Cmd + O',
     recent: '最近打开',
     clear: '清空',
+    opening: '正在打开…',
   },
 
   rail: {
@@ -330,6 +331,8 @@ export const zh: Strings = {
     exported: '已导出 {count} 张图片',
     imagesPdf: '已生成 {name}',
     signed: '已签名：{name}',
+    stillOpening: '打开已超过 {sec} 秒仍未结束 —— 若一直没有结果，可复制这个路径排查：{path}',
+    dismiss: '知道了',
   },
 
   error: {

@@ -49,6 +49,7 @@ export const en = {
     hint: 'or press Ctrl/Cmd + O',
     recent: 'Recent',
     clear: 'Clear',
+    opening: 'Opening…',
   },
 
   rail: {
@@ -341,6 +342,10 @@ export const en = {
     imagesPdf: 'Created {name}',
     // 破折号而不是冒号：见 dsignReady 上面对 family-check 取键正则的说明。
     signed: 'Signed — {name}',
+    // 值里不出现 ASCII 冒号（family-check 的取键正则会把「某词 + 半角冒号」读成一个
+    // 新键，报「仅 en 有」）。见本文件 dsignReady 上方同一条说明。
+    stillOpening: 'Still opening after {sec}s. If it never finishes, copy the path below to check — {path}',
+    dismiss: 'Dismiss',
   },
 
   error: {

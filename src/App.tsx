@@ -80,6 +80,12 @@ const THEME_KEY = 'rocktier.theme';
 const THEME_KEY_LEGACY = 'rocktier-pdf-editor.theme';
 const THEME_CYCLE: readonly Theme[] = ['auto', 'light', 'dark'];
 
+/* 打开请求的兜底时限（毫秒）。pdfium 打开一份文档实测在秒级以内，超过这个时长
+   还不返回，就是后端 IPC 挂住了 —— 挂住时 busy 永远为真：状态栏的「处理中」不再
+   消失、Recent 列表永久置灰、界面除了那行 10.5px 小字之外没有任何解释。
+   到点把进行中状态交还给用户（解除禁用），并把完整路径留成一条可复制的提示。 */
+const OPEN_STALL_MS = 8000;
+
 export function App() {
   const t = useT();
 
@@ -137,7 +143,10 @@ export function App() {
       .catch(() => setLicense(null));
   }, []);
   const [dragActive, setDragActive] = useState(false);
-  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const [toast, setToast] = useState<{ text: string; error?: boolean; sticky?: boolean } | null>(null);
+  /** 正在打开的文件路径（没有则为 null）。既是空态那一行的进行中指示，也是
+   *  兜底计时的对象 —— 见 OPEN_STALL_MS。 */
+  const [openingPath, setOpeningPath] = useState<string | null>(null);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
@@ -232,9 +241,11 @@ export function App() {
     setTheme((prev) => THEME_CYCLE[(THEME_CYCLE.indexOf(prev) + 1) % THEME_CYCLE.length]);
   }, []);
 
-  const notify = useCallback((text: string, error = false) => {
-    setToast({ text, error });
-    window.setTimeout(() => setToast(null), 2600);
+  const notify = useCallback((text: string, error = false, sticky = false) => {
+    setToast({ text, error, sticky });
+    // sticky = 不自动消失：兜底提示带的是完整路径，用户要的是选中复制，
+    // 2.6 秒就闪掉的路径等于没给。关闭走渲染处那颗独立按钮。
+    if (!sticky) window.setTimeout(() => setToast(null), 2600);
   }, []);
 
   /** 记一笔最近打开。同一路径只留一条，最新的排最前。 */
@@ -255,7 +266,11 @@ export function App() {
   // useEffect 的依赖数组在渲染期求值，晚于 const 声明会踩 TDZ。
   const runOpen = useCallback(
     async (path: string, password?: string) => {
+      setOpeningPath(path);
       const { info, error } = await pdf.openPathWithResult(path, password);
+      // 用函数式清理：并发时（拖拽 + 菜单同开）先返回的那个不能把后一次请求的
+      // 进行中指示抹掉。挂起不返回时这一行永远跑不到 —— 兜底见 OPEN_STALL_MS。
+      setOpeningPath((cur) => (cur === path ? null : cur));
       if (info) {
         setCurrent(0);
         setZoom(1);
@@ -289,6 +304,19 @@ export function App() {
     },
     [pdf.doc?.dirty, runOpen]
   );
+
+  /* 打开挂起的兜底，理由见 OPEN_STALL_MS。到点做两件事：把进行中状态解除（Recent
+     立刻重新可点，用户不用重启应用就能重试），再留一条不自动消失、路径可选中复制
+     的提示。措辞只说事实 —— 「仍未结束」，不谎报「失败」：迟到的成功照样会渲染。 */
+  useEffect(() => {
+    if (!openingPath) return;
+    const stalled = openingPath;
+    const timer = window.setTimeout(() => {
+      setOpeningPath((cur) => (cur === stalled ? null : cur));
+      notify(t('toast.stillOpening', { sec: OPEN_STALL_MS / 1000, path: stalled }), true, true);
+    }, OPEN_STALL_MS);
+    return () => window.clearTimeout(timer);
+  }, [openingPath, notify, t]);
 
   /* ── Drag & drop from the OS ────────────────────────────────── */
   useEffect(() => {
@@ -1098,6 +1126,7 @@ export function App() {
             recent={recent}
             onOpenRecent={requestOpen}
             onClearRecent={clearRecent}
+            opening={openingPath}
           />
         </main>
       )}
@@ -1240,7 +1269,22 @@ export function App() {
         </Modal>
       ) : null}
 
-      {toast ? <div className={`toast${toast.error ? ' error' : ''}`}>{toast.text}</div> : null}
+      {toast ? (
+        /* sticky = 打开挂起的兜底提示：不自动消失，因为里面装的是要人抄下来的路径。
+           关闭走独立按钮而不是「点整条就消失」—— 选中路径的动作必然伴随一次点击，
+           整条可关会让它在复制的前一瞬丢掉。 */
+        <div
+          className={`toast${toast.error ? ' error' : ''}${toast.sticky ? ' sticky' : ''}`}
+          role={toast.sticky ? 'alert' : 'status'}
+        >
+          <span>{toast.text}</span>
+          {toast.sticky ? (
+            <button type="button" className="toast-dismiss" onClick={() => setToast(null)}>
+              {t('toast.dismiss')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
