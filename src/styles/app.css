@@ -668,7 +668,7 @@
   align-items: center;
   gap: 14px;
   font-variant-numeric: tabular-nums;
-  height: 40px;
+  height: var(--statusbar-h);
   padding: 0 14px;
   border-top: 1px solid var(--border);
   background: var(--bg-secondary);
