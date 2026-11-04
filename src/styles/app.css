@@ -581,7 +581,14 @@
 .recent-clear {
   background: none;
   border: 0;
-  padding: 2px 4px;
+  /* 命中区 ≥24×24（WCAG 2.5.8 AA）：此前约 38×20。用 padding 扩热区，
+     文字本身字号与颜色不变。 */
+  padding: 4px 6px;
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;

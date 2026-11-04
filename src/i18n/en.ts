@@ -406,6 +406,7 @@ export const en = {
   dsign: {
     title: 'Digital signature',
     close: 'Close',
+    cancel: 'Cancel',
     tab: { certs: 'Certificates', sign: 'Sign', verify: 'Verify' },
     engineMissing: 'The signing engine is missing from this build. Reinstall Rocktier PDF.',
     cert: {

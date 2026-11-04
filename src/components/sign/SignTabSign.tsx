@@ -4,6 +4,7 @@ import { localizeError } from '../../services/errorText';
 import { allowExpiredCert, pickSignatureImage, signPdf } from '../../services/sign';
 import type { CertInfo, DocumentInfo } from '../../types';
 import type { SignPlacement } from '../SignDialog';
+import { ConfirmStrip } from '../ConfirmDialog';
 
 /** 默认签名外观尺寸（PDF 点）。与引擎默认值一致，避免签完位置漂移。 */
 const SIG_W = 160;
@@ -40,6 +41,13 @@ export function SignTabSign({
   const [signerName, setSignerName] = useState('');
   const [output, setOutput] = useState(() => defaultOutput(doc.path));
   const [imagePath, setImagePath] = useState<string | null>(null);
+  // 过期证书需二次确认：原生 window.confirm 已改为下方应用内确认条。
+  const [expiredPrompt, setExpiredPrompt] = useState<{
+    certId: string;
+    notAfter: string;
+    placement: SignPlacement;
+    rect: string;
+  } | null>(null);
   // 用户一旦手动改过签署人姓名，切换证书就不再覆盖它。
   const nameEditedRef = useRef(false);
 
@@ -110,19 +118,9 @@ export function SignTabSign({
         if (!msg.startsWith('CERT_EXPIRED_CONFIRM|')) throw e;
         const [, expiredCertId, notAfter] = msg.split('|');
         if (!expiredCertId) throw e;
-        const confirmed = window.confirm(
-          t('dsign.sign.expiredConfirm', { date: notAfter ?? '' })
-        );
-        if (!confirmed) {
-          /* 用户点了「取消」：错误框里绝不能回填 `msg` —— 按设计它就是不翻译的原始
-             线路串 `CERT_EXPIRED_CONFIRM|{证书}|{日期}`（映射掉会断掉上面那段 startsWith
-             匹配，见 services/errorText.ts）。复用过期的问句（en/zh 都已有 {date} 变量），
-             不新增文案、不加映射表条目。重试路径原样不动。 */
-          onError(t('dsign.sign.expiredConfirm', { date: notAfter ?? '' }));
-          return;
-        }
-        await allowExpiredCert(expiredCertId);
-        info = await callSign(placement, rect);
+        // 弹应用内确认条，等用户决定；busy 由 finally 交还。
+        setExpiredPrompt({ certId: expiredCertId, notAfter: notAfter ?? '', placement, rect });
+        return;
       }
       onSigned(info);
     } catch (e) {
@@ -130,6 +128,32 @@ export function SignTabSign({
     } finally {
       setBusy(false);
     }
+  };
+
+  /** 确认使用过期证书：放行后按原参数重试一次。 */
+  const confirmExpired = async () => {
+    if (!expiredPrompt) return;
+    const pending = expiredPrompt;
+    setExpiredPrompt(null);
+    setBusy(true);
+    try {
+      await allowExpiredCert(pending.certId);
+      onSigned(await callSign(pending.placement, pending.rect));
+    } catch (e) {
+      onError(localizeError(String(e), t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelExpired = () => {
+    const date = expiredPrompt?.notAfter ?? '';
+    setExpiredPrompt(null);
+    /* 用户点了「取消」：错误框里绝不能回填 `msg` —— 按设计它就是不翻译的原始
+       线路串 `CERT_EXPIRED_CONFIRM|{证书}|{日期}`（映射掉会断掉上面那段 startsWith
+       匹配，见 services/errorText.ts）。复用过期问句（en/zh 都已含 {date}），
+       不新增文案、不加映射表条目。 */
+    onError(t('dsign.sign.expiredConfirm', { date }));
   };
 
   return (
@@ -215,12 +239,23 @@ export function SignTabSign({
       <div className="row">
         <button
           className="btn btn-primary"
-          disabled={busy || doc.dirty}
+          disabled={busy || doc.dirty || expiredPrompt !== null}
           onClick={() => void submit()}
         >
           {t('dsign.sign.submit')}
         </button>
       </div>
+
+      {expiredPrompt ? (
+        <ConfirmStrip
+          title={t('dsign.cert.expired')}
+          message={t('dsign.sign.expiredConfirm', { date: expiredPrompt.notAfter })}
+          confirmLabel={t('dsign.cert.allowExpired')}
+          busy={busy}
+          onCancel={cancelExpired}
+          onConfirm={() => void confirmExpired()}
+        />
+      ) : null}
     </div>
   );
 }

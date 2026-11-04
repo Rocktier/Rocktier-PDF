@@ -395,9 +395,12 @@ export function App() {
   }, []);
 
   /* ── Native menu ────────────────────────────────────────────── */
+  /* 菜单项启用态依赖「是否有文档」：无文档时「导出为 Markdown」「查找」置灰，
+     而不是让用户点了没反应。打开/关闭文档也要重建，否则启用态会停在旧值。 */
+  const hasDoc = pdf.doc != null;
   useEffect(() => {
-    void buildMenu(lang);
-  }, [lang]);
+    void buildMenu(lang, hasDoc);
+  }, [lang, hasDoc]);
 
   useEffect(() => {
     let disposed = false;

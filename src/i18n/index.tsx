@@ -81,8 +81,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
     /* 切换语言必须重建原生菜单 —— 菜单项文案硬编码在 Rust 侧，
        只换前端字典的话，工具栏是日文、菜单还是英文。
-       （L2_i18n 规则：切换语言必须重渲染全部界面，含原生菜单） */
-    void invokeRebuildMenu(lang);
+       （L2_i18n 规则：切换语言必须重渲染全部界面，含原生菜单）
+       重建动作由 App 负责：它同时知道「是否有文档」，而菜单项的启用态
+       依赖该状态（services/engine.ts buildMenu(lang, hasDoc)）。 */
   }, [lang]);
 
   const setLang = useCallback((next: Lang) => setLangState(next), []);
@@ -103,17 +104,6 @@ export function useI18n(): LangContextValue {
 /** Shorthand: `const t = useT();` */
 export function useT(): (path: string, vars?: Vars) => string {
   return useContext(LangContext).t;
-}
-
-/** 重建原生菜单（Rust 侧 build_menu）。浏览器/非 Tauri 环境静默跳过。
- *  lang 必须显式传参：这是模块级函数，拿不到组件作用域里的 lang。 */
-async function invokeRebuildMenu(lang: Lang): Promise<void> {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('build_menu', { lang });
-  } catch {
-    /* dev 模式或非 Tauri 环境：忽略 */
-  }
 }
 
 export { LOCALES };

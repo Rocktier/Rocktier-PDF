@@ -166,7 +166,7 @@ impl MenuStrings {
 /// event; predefined items are localised by the OS and keep their own
 /// accelerators. Undo/redo are custom because the document — not the webview —
 /// owns the edit history.
-fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
+fn build_app_menu(app: &AppHandle, lang: &str, has_doc: bool) -> tauri::Result<()> {
     let m = MenuStrings::for_lang(lang);
 
     let open_i = MenuItem::with_id(app, "open", m.open, true, Some("CmdOrCtrl+O"))?;
@@ -221,11 +221,12 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             // 路线图 R4：导出为 Markdown。放File 菜单而非工具栏 ——
             // 它是「输出到另一种格式」，与导出 PNG 同类，且低频。
+            // 无文档时置灰（而非点了没反应）：启用态随 has_doc 一起重建。
             &MenuItem::with_id(
                 app,
                 "export-markdown",
                 m.export_markdown,
-                true,
+                has_doc,
                 Some("CmdOrCtrl+Shift+M"),
             )?,
             &PredefinedMenuItem::separator(app)?,
@@ -251,7 +252,7 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
         ],
     )?;
 
-    let find_i = MenuItem::with_id(app, "find", m.find, true, Some("CmdOrCtrl+F"))?;
+    let find_i = MenuItem::with_id(app, "find", m.find, has_doc, Some("CmdOrCtrl+F"))?;
     let actual_i =
         MenuItem::with_id(app, "actual-size", m.actual_size, true, None::<&str>)?;
     let theme_i = MenuItem::with_id(app, "toggle-theme", m.toggle_theme, true, None::<&str>)?;
@@ -323,10 +324,12 @@ fn build_app_menu(app: &AppHandle, lang: &str) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Rebuilt by the frontend on mount and on every language change.
+/// Rebuilt by the frontend on mount, on every language change, and whenever a
+/// document opens/closes — `has_doc` drives the enabled state of
+/// `export-markdown` / `find` (disabled instead of silently ignoring clicks).
 #[tauri::command]
-fn build_menu(app: AppHandle, lang: String) -> Result<(), String> {
-    build_app_menu(&app, &lang).map_err(|e| e.to_string())
+fn build_menu(app: AppHandle, lang: String, has_doc: bool) -> Result<(), String> {
+    build_app_menu(&app, &lang, has_doc).map_err(|e| e.to_string())
 }
 
 /// Opens an external link from the Help menu, restricted to a whitelist.

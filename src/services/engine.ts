@@ -108,9 +108,10 @@ export async function stampDocument(
 
 /* ── Native menu ────────────────────────────────────────────────── */
 
-/** (Re)builds the native menu for the given UI language. */
-export async function buildMenu(lang: string): Promise<void> {
-  return invoke<void>('build_menu', { lang });
+/** (Re)builds the native menu for the given UI language. `hasDoc` 决定
+ *  「导出为 Markdown」「查找」是否可用 —— 没有文档时菜单项置灰而不是点了没反应。 */
+export async function buildMenu(lang: string, hasDoc: boolean): Promise<void> {
+  return invoke<void>('build_menu', { lang, hasDoc });
 }
 
 /** Opens a whitelisted external URL (Help menu). */

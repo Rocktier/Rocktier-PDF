@@ -393,6 +393,7 @@ export const zh: Strings = {
   dsign: {
     title: '数字签名',
     close: '关闭',
+    cancel: '取消',
     tab: { certs: '证书', sign: '签名', verify: '验证' },
     engineMissing: '本安装包缺少签名引擎，请重新安装 Rocktier PDF。',
     cert: {

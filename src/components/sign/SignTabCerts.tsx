@@ -11,6 +11,7 @@ import {
   setDefaultCert,
 } from '../../services/sign';
 import type { CertInfo, CertMeta } from '../../types';
+import { ConfirmStrip } from '../ConfirmDialog';
 
 interface Props {
   certs: CertInfo[];
@@ -31,6 +32,8 @@ export function SignTabCerts({ certs, defaultCert, busy, setBusy, onChanged, onE
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [preview, setPreview] = useState<CertMeta | null>(null);
+  // 删除证书属破坏性操作：应用内确认（原生 window.confirm 已移除）。
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const pickFile = async (
     file: File | null,
@@ -109,10 +112,13 @@ export function SignTabCerts({ certs, defaultCert, busy, setBusy, onChanged, onE
       await onChanged();
     });
 
-  const handleDelete = (name: string) =>
+  const handleDelete = (name: string) => setPendingDelete(name);
+
+  const confirmDelete = () =>
     run(async () => {
-      if (!window.confirm(t('dsign.cert.deleteConfirm', { name }))) return;
-      await deleteCert(name);
+      if (!pendingDelete) return;
+      await deleteCert(pendingDelete);
+      setPendingDelete(null);
       await onChanged();
     });
 
@@ -243,6 +249,18 @@ export function SignTabCerts({ certs, defaultCert, busy, setBusy, onChanged, onE
           })}
         </ul>
       )}
+
+      {pendingDelete ? (
+        <ConfirmStrip
+          title={t('dsign.cert.delete')}
+          message={t('dsign.cert.deleteConfirm', { name: pendingDelete })}
+          confirmLabel={t('dsign.cert.delete')}
+          danger
+          busy={busy}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
     </div>
   );
 }
