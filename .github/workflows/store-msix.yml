@@ -41,7 +41,12 @@ jobs:
           # be present or the MSIX step fails.
           targets: x86_64-pc-windows-msvc
 
+      # pwsh 而非 job 级默认 bash：postinstall 的 fetch-pdfium.mjs 用 `tar -xzf`
+      # 解压，Git Bash 的 PATH 会把 GNU tar 顶到前面，它把 `C:\...` 当成远程主机
+      # 报 "Cannot connect to C: resolve failed"。pwsh 下 npm 的 cmd 找到的是
+      # System32 的 bsdtar，与 release.yml 行为一致。
       - name: Install frontend deps
+        shell: pwsh
         run: npm ci
 
       - uses: actions/setup-go@v5
