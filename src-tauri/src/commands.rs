@@ -741,6 +741,12 @@ pub async fn split_document(
 /// Runs on the blocking pool: a search over a 900-page book is seconds of
 /// CPU-bound Pdfium work, and running that on the async runtime starves every
 /// other command — the window goes unresponsive until the scan finishes.
+///
+/// 逐页取锁（2026-11-14）：此前整段扫描持有 `state.doc`，于是慢查询期间
+/// 渲染/滚动/大纲全部排在后面，窗口看起来是卡死。现在每页只持锁一次
+/// （一页文本抽取是毫秒级），页与页之间把锁让出去。代价是要防止扫描途中
+/// 文档被换掉：页码就对不上了，所以每页都核对 path 与页数，变了直接报错，
+/// 不把 A 的坐标套到 B 上。
 #[tauri::command]
 pub async fn search_document(
     app: AppHandle,
@@ -748,13 +754,52 @@ pub async fn search_document(
     match_case: bool,
     whole_word: bool,
 ) -> CmdResult<Vec<SearchHit>> {
+    const MAX_HITS: usize = 5000;
+
     tauri::async_runtime::spawn_blocking(move || {
         // A `State` borrow cannot cross into this `'static` task, so the state
         // is fetched through the handle instead.
         let state = app.state::<AppState>();
-        let guard = state.doc.lock().map_err(|e| e.to_string())?;
-        let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
-        crate::pdf::search_document(&doc.document, &query, match_case, whole_word)
+
+        let (path, total) = {
+            let guard = state.doc.lock().map_err(|e| e.to_string())?;
+            let doc = guard
+                .as_ref()
+                .ok_or_else(|| "No document is open".to_string())?;
+            (doc.path.clone(), doc.document.pages().len())
+        };
+
+        // 空查询不扫页：pdfium 的 page.text() 会把整页文字抽出来，
+        // 900 页白跑一遍就为了一个空结果，不值得。
+        if query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut hits: Vec<SearchHit> = Vec::new();
+        for index in 0..total {
+            let page_hits = {
+                let guard = state.doc.lock().map_err(|e| e.to_string())?;
+                let doc = guard
+                    .as_ref()
+                    .ok_or_else(|| "Document closed during search".to_string())?;
+                if doc.path != path || doc.document.pages().len() != total {
+                    return Err("Document changed during search".to_string());
+                }
+                crate::pdf::search_page(
+                    &doc.document,
+                    index,
+                    &query,
+                    match_case,
+                    whole_word,
+                    MAX_HITS.saturating_sub(hits.len()),
+                )?
+            };
+            hits.extend(page_hits);
+            if hits.len() >= MAX_HITS {
+                break;
+            }
+        }
+        Ok(hits)
     })
     .await
     .map_err(|e| format!("search task failed: {e}"))?

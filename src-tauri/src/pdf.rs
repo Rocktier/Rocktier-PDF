@@ -281,9 +281,58 @@ pub fn page_text(doc: &PdfDocument, index: i32) -> Result<String, String> {
     Ok(text.all())
 }
 
-/// Case-insensitive (by default) search across every page, returning the
-/// bounding box of each hit. Capped so a pathological document cannot flood
-/// the IPC channel.
+/// Text search on a single page. Extracted so the command layer can take the
+/// document lock one page at a time instead of holding it for a whole book:
+/// a 900-page scan is seconds of pdfium work, and every other command
+/// (rendering, scrolling, outline) queued behind that mutex — the window
+/// looked frozen even though it was only waiting.
+///
+/// `remaining` caps how many hits this page may still contribute, so the
+/// caller can keep the global cap without re-counting after the fact.
+pub fn search_page(
+    doc: &PdfDocument,
+    index: i32,
+    needle: &str,
+    match_case: bool,
+    whole_word: bool,
+    remaining: usize,
+) -> Result<Vec<SearchHit>, String> {
+    let needle = needle.trim();
+    if needle.is_empty() || remaining == 0 {
+        return Ok(Vec::new());
+    }
+
+    let options = PdfSearchOptions::new()
+        .match_case(match_case)
+        .match_whole_word(whole_word);
+
+    let page = doc.pages().get(index).map_err(|e| e.to_string())?;
+    let text = page.text().map_err(|e| e.to_string())?;
+    let search = text.search(needle, &options).map_err(|e| e.to_string())?;
+
+    let mut hits: Vec<SearchHit> = Vec::new();
+    while let Some(segments) = search.find_next() {
+        for segment in segments.iter() {
+            let b = segment.bounds();
+            hits.push(SearchHit {
+                page: index,
+                x: b.left().value,
+                y: b.bottom().value,
+                width: b.width().value,
+                height: b.height().value,
+            });
+        }
+        if hits.len() >= remaining {
+            break;
+        }
+    }
+    Ok(hits)
+}
+
+/// 整本扫描的便捷封装。**只给测试用** —— 命令层故意一页一页取锁
+/// （见 `commands::search_document`），而不是拿着锁扫完整本。
+/// 放在 `cfg(test)` 里是为了不让它在非测试构建变成一段死代码（-D warnings 会红）。
+#[cfg(test)]
 pub fn search_document(
     doc: &PdfDocument,
     needle: &str,
@@ -292,34 +341,19 @@ pub fn search_document(
 ) -> Result<Vec<SearchHit>, String> {
     const MAX_HITS: usize = 5000;
 
-    let needle = needle.trim();
-    if needle.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let options = PdfSearchOptions::new()
-        .match_case(match_case)
-        .match_whole_word(whole_word);
-
     let mut hits: Vec<SearchHit> = Vec::new();
     for index in 0..doc.pages().len() {
-        let page = doc.pages().get(index).map_err(|e| e.to_string())?;
-        let text = page.text().map_err(|e| e.to_string())?;
-        let search = text.search(needle, &options).map_err(|e| e.to_string())?;
-        while let Some(segments) = search.find_next() {
-            for segment in segments.iter() {
-                let b = segment.bounds();
-                hits.push(SearchHit {
-                    page: index,
-                    x: b.left().value,
-                    y: b.bottom().value,
-                    width: b.width().value,
-                    height: b.height().value,
-                });
-            }
-            if hits.len() >= MAX_HITS {
-                return Ok(hits);
-            }
+        let page_hits = search_page(
+            doc,
+            index,
+            needle,
+            match_case,
+            whole_word,
+            MAX_HITS.saturating_sub(hits.len()),
+        )?;
+        hits.extend(page_hits);
+        if hits.len() >= MAX_HITS {
+            break;
         }
     }
     Ok(hits)
