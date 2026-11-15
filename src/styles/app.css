@@ -1144,11 +1144,12 @@
 
 .tool {
   min-width: 32px;
-  height: 32px;
-  padding: 0 6px;
-  gap: 5px;
+  height: 44px;
+  padding: 4px 6px;
+  gap: 3px;
   flex: none;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
@@ -1160,10 +1161,13 @@
     border-color var(--dur-hover) var(--ease);
 }
 
-/* 图标旁的功能名（2026-11-15 用户反馈「一眼看不出图标是干嘛的」）。
-   窄窗放不下文字时退回纯图标 + tooltip。 */
+/* 图标下方的功能名（2026-11-15 用户反馈「一眼看不出图标是干嘛的」；
+   旁置文字被否决——功能多、视觉负担重。定稿 = best-minds 专家共识：
+   Office/Acrobat/macOS 对桌面工具条的同一答案——小标签放图标**下方**，
+   只给易混组配，通用图形（撤销/查找/旋转/缩放）保持纯图标。
+   窄窗放不下时退回纯图标 + tooltip。 */
 .tool-label {
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
   white-space: nowrap;
 }
