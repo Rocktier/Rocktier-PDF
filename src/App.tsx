@@ -1035,7 +1035,7 @@ export function App() {
         onSplit={() => setDialog('split')}
         onStamp={() => setDialog('stamp')}
         onExportImages={exportImages}
-            onExportLongImage={exportLongImage}
+        onExportLongImage={exportLongImage}
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
         onDigitalSign={openSignDialog}
@@ -1123,7 +1123,6 @@ export function App() {
             onMarkdown={() => setDialog('markdown')}
             onStamp={() => setDialog('stamp')}
             onExportImages={exportImages}
-            onExportLongImage={exportLongImage}
             onImagesToPdf={runImagesToPdf}
           />
         </main>
