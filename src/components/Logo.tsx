@@ -158,6 +158,14 @@ export const IconExportImages = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+/** 长图：一整张高页 + 两道折线（多页纵向拼接的隐喻） */
+export const IconLongImage = ({ size = 16 }: IconProps) => (
+  <svg {...base(size)}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="1.2" />
+    <path d="M6.5 9h11M6.5 15h11" strokeDasharray="2 2" />
+  </svg>
+);
+
 export const IconImagesToPdf = ({ size = 16 }: IconProps) => (
   <svg {...base(size)}>
     <rect x="2.5" y="2.5" width="7" height="8.5" rx="1" />

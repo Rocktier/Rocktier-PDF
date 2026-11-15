@@ -864,6 +864,60 @@ pub fn export_pages_as_png(
     Ok(results)
 }
 
+/// 把给定页渲染后**纵向拼成一张长图**（PNG）。这是「PDF 转图片」的第二个
+/// 输出模式（对标腾讯帮小忙 pdf_2_png 的「长图」档）：逐页导出已有，
+/// 长图补的是「一次转发/粘贴全部页」的场景。
+///
+/// 宽度统一 `width`；旋转页（宽高互换）在长图内水平居中。
+/// 总高上限 60,000 px：1600 宽 × 60,000 高的 RGBA 缓冲约 380 MB——
+/// 再高就是把内存当筹码了，超限报错让用户少选几页。
+pub fn export_pages_as_long_png(
+    doc: &PdfDocument,
+    indices: &[i32],
+    output_path: &str,
+    width: Pixels,
+) -> Result<PathResult, String> {
+    const MAX_TOTAL_HEIGHT: u32 = 60_000;
+    if indices.is_empty() {
+        return Err("No pages selected".to_string());
+    }
+
+    let mut pages: Vec<image::RgbaImage> = Vec::with_capacity(indices.len());
+    for &index in indices {
+        let page = render_page(doc, index, width)?;
+        let encoded = page.data_url.split(',').nth(1).unwrap_or("");
+        let bytes = BASE64.decode(encoded).map_err(|e| e.to_string())?;
+        let img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png)
+            .map_err(|e| format!("Cannot decode page image: {e}"))?;
+        pages.push(img.to_rgba8());
+    }
+
+    let width_max = pages.iter().map(|p| p.width()).max().unwrap_or(0);
+    let total_height: u32 = pages.iter().map(|p| p.height()).sum();
+    if total_height > MAX_TOTAL_HEIGHT {
+        return Err(format!(
+            "Too many pages: stitched image height {total_height}px exceeds the {MAX_TOTAL_HEIGHT}px limit"
+        ));
+    }
+
+    let mut canvas = image::RgbaImage::new(width_max, total_height);
+    let mut y: u32 = 0;
+    for page in &pages {
+        let x = (width_max - page.width()) / 2;
+        image::imageops::overlay(&mut canvas, page, x as i64, y as i64);
+        y += page.height();
+    }
+
+    let out = if output_path.to_lowercase().ends_with(".png") {
+        output_path.to_string()
+    } else {
+        format!("{output_path}.png")
+    };
+    canvas.save(&out).map_err(|e| format!("Cannot write image: {e}"))?;
+    let size = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
+    Ok(PathResult { path: out, size })
+}
+
 /// Builds a new PDF with one page per image (JPEG or PNG), each page sized to
 /// the image at 96 dpi so it lands at its natural printed size.
 pub fn images_to_pdf(

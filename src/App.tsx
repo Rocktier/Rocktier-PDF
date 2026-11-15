@@ -29,6 +29,7 @@ import {
   buildMenu,
   copyText,
   exportPageImages,
+  exportPageImagesLong,
   fileStem,
   imagesToPdf,
   initialFile,
@@ -37,6 +38,7 @@ import {
   openUrl,
   pageText,
   pickDirectory,
+  pickPngSavePath,
   pickImages,
   pickPdf,
   pickSavePath,
@@ -732,6 +734,21 @@ export function App() {
     }
   }, [notify, pdf, t]);
 
+  // 长图：全部选中页纵向拼成一张 PNG（对标帮小忙 pdf_2_png 的长图档，阶段 182）。
+  const exportLongImage = useCallback(async () => {
+    if (!pdf.doc) return;
+    const pages = pdf.selected.length > 0 ? pdf.selected : pdf.doc.pages.map((p) => p.index);
+    const target = await pickPngSavePath(`${fileStem(pdf.doc.name)}-long.png`);
+    if (!target) return;
+    try {
+      const result = await exportPageImagesLong(pages, target, 1600);
+      notify(t('toast.longImage', { name: fileStem(result.path) + '.png' }));
+      void revealInFinder(result.path);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    }
+  }, [notify, pdf, t]);
+
   const runImagesToPdf = useCallback(async () => {
     const imagePaths = await pickImages();
     if (imagePaths.length === 0) return;
@@ -1018,6 +1035,7 @@ export function App() {
         onSplit={() => setDialog('split')}
         onStamp={() => setDialog('stamp')}
         onExportImages={exportImages}
+            onExportLongImage={exportLongImage}
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
         onDigitalSign={openSignDialog}
@@ -1105,6 +1123,7 @@ export function App() {
             onMarkdown={() => setDialog('markdown')}
             onStamp={() => setDialog('stamp')}
             onExportImages={exportImages}
+            onExportLongImage={exportLongImage}
             onImagesToPdf={runImagesToPdf}
           />
         </main>

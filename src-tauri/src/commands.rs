@@ -1001,6 +1001,31 @@ pub async fn export_page_images(
     crate::pdf::export_pages_as_png(&doc.document, &sorted, &output_dir, &file_stem(&doc.path), width)
 }
 
+/// Export the given pages stitched vertically into one long PNG image.
+#[tauri::command]
+pub async fn export_page_images_long(
+    state: State<'_, AppState>,
+    indices: Vec<i32>,
+    output_path: String,
+    width: i32,
+) -> CmdResult<PathResult> {
+    ensure_write_allowed()?;
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+
+    let total = doc.document.pages().len();
+    let mut sorted = indices;
+    sorted.sort_unstable();
+    sorted.dedup();
+    for &i in &sorted {
+        if i < 0 || i >= total {
+            return Err(format!("Page {} is out of range", i + 1));
+        }
+    }
+
+    crate::pdf::export_pages_as_long_png(&doc.document, &sorted, &output_path, width)
+}
+
 /// Build a PDF from a list of image files (JPEG / PNG).
 #[tauri::command]
 pub async fn images_to_pdf(

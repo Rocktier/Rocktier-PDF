@@ -8,6 +8,7 @@ import {
   IconHighlight,
   IconImagesToPdf,
   IconLock,
+  IconLongImage,
   IconMarkdown,
   IconMerge,
   IconMinus,
@@ -48,6 +49,7 @@ interface ToolbarProps {
   onSplit: () => void;
   onStamp: () => void;
   onExportImages: () => void;
+  onExportLongImage: () => void;
   onImagesToPdf: () => void;
   onSign: () => void;
   /** 数字签名（密码学）—— 与上面那个图片印章是两回事。 */
@@ -272,6 +274,7 @@ export function Toolbar({
           aria-label={t('markup.highlight')}
         >
           <IconHighlight />
+          <span className="tool-label">{t('markup.highlight')}</span>
         </button>
         <button
           className="tool"
@@ -282,6 +285,7 @@ export function Toolbar({
           aria-label={t('markup.underline')}
         >
           <IconUnderline />
+          <span className="tool-label">{t('markup.underline')}</span>
         </button>
         <button
           className="tool"
@@ -292,6 +296,7 @@ export function Toolbar({
           aria-label={t('markup.strikeout')}
         >
           <IconStrikeout />
+          <span className="tool-label">{t('markup.strikeout')}</span>
         </button>
         <button
           className="tool"
@@ -302,6 +307,7 @@ export function Toolbar({
           aria-label={t('markup.note')}
         >
           <IconNote />
+          <span className="tool-label">{t('markup.note')}</span>
         </button>
         {/* 图片印章（视觉图章，不是密码学签名）。数字签名在顶栏与检查器。 */}
         <button
@@ -313,6 +319,7 @@ export function Toolbar({
           aria-label={t('toolbar.sign')}
         >
           <IconSign />
+          <span className="tool-label">{t('toolbar.sign')}</span>
         </button>
         <button
           className="tool tool-danger"
@@ -323,6 +330,7 @@ export function Toolbar({
           aria-label={t('redact.toolbar')}
         >
           <IconRedact />
+          <span className="tool-label">{t('redact.toolbar')}</span>
         </button>
 
         <span className="tool-sep" />
@@ -347,6 +355,7 @@ export function Toolbar({
           aria-label={t('toolbar.merge')}
         >
           <IconMerge />
+          <span className="tool-label">{t('toolbar.merge')}</span>
         </button>
         <button
           className="tool"
@@ -356,6 +365,7 @@ export function Toolbar({
           aria-label={t('toolbar.split')}
         >
           <IconSplit />
+          <span className="tool-label">{t('toolbar.split')}</span>
         </button>
         <button
           className="tool"
@@ -445,6 +455,15 @@ export function Toolbar({
               >
                 <IconExportImages />
                 {t('toolbar.exportImages')}
+              </button>
+              <button
+                className="menu-item"
+                role="menuitem"
+                onClick={pick(onExportLongImage)}
+                disabled={!doc || busy}
+              >
+                <IconLongImage />
+                {t('toolbar.exportLongImage')}
               </button>
               <button
                 className="menu-item"

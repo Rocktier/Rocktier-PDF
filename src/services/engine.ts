@@ -374,6 +374,15 @@ export async function exportPageImages(
   return invoke<PathResult[]>('export_page_images', { indices, outputDir, width });
 }
 
+/** Export the given pages stitched vertically into one long PNG image. */
+export async function exportPageImagesLong(
+  indices: number[],
+  outputPath: string,
+  width: number
+): Promise<PathResult> {
+  return invoke<PathResult>('export_page_images_long', { indices, outputPath, width });
+}
+
 /** Build a PDF (one page per image) from image files. */
 export async function imagesToPdf(paths: string[], outputPath: string): Promise<PathResult> {
   return invoke<PathResult>('images_to_pdf', { paths, outputPath });
@@ -404,6 +413,13 @@ export async function pickSavePath(defaultName: string): Promise<string | null> 
   return saveDialog({
     defaultPath: defaultName,
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  });
+}
+
+export async function pickPngSavePath(defaultName: string): Promise<string | null> {
+  return saveDialog({
+    defaultPath: defaultName,
+    filters: [{ name: 'PNG', extensions: ['png'] }],
   });
 }
 

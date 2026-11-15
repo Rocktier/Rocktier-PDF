@@ -1143,8 +1143,10 @@
 }
 
 .tool {
-  width: 32px;
+  min-width: 32px;
   height: 32px;
+  padding: 0 6px;
+  gap: 5px;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -1156,6 +1158,20 @@
   cursor: pointer;
   transition: background var(--dur-hover) var(--ease), color var(--dur-hover) var(--ease),
     border-color var(--dur-hover) var(--ease);
+}
+
+/* 图标旁的功能名（2026-11-15 用户反馈「一眼看不出图标是干嘛的」）。
+   窄窗放不下文字时退回纯图标 + tooltip。 */
+.tool-label {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .tool-label {
+    display: none;
+  }
 }
 
 .tool:hover:not(:disabled) {
