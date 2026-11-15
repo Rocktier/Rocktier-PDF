@@ -223,6 +223,8 @@
   background: none;
   border: none;
   border-left: 2px solid transparent;
+  /* 选定框（Lenso 设计稿 .outline-item.on）：8px 圆角安静方框 */
+  border-radius: 8px;
 }
 
 .thumb:hover {
@@ -235,8 +237,9 @@
 }
 
 .thumb.active {
-  background: var(--bg-card-hover);
-  border-left-color: var(--accent);
+  /* 选定框：中性低强度底，左缘 accent 竖条退役 —— 选中是状态，不是强调 */
+  background: var(--accent-muted);
+  border-left-color: transparent;
 }
 
 .thumb.selected .thumb-canvas {
