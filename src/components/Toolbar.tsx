@@ -93,6 +93,7 @@ export function Toolbar({
   onSplit,
   onStamp,
   onExportImages,
+  onExportLongImage,
   onImagesToPdf,
   onSign,
   onDigitalSign,
