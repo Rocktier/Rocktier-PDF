@@ -3,8 +3,15 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-primary);
   color: var(--text-primary);
+  /* 品牌柔光底（D-158 §2，B 方案，自 MD 移植）：窗口不透明，玻璃要透出
+     颜色就得把渐变画进应用自己。三团 radial 在前 = 在上；线性底垫底。 */
+  background-color: var(--canvas);
+  background-image:
+    radial-gradient(120% 90% at 12% 0%, var(--wash-1) 0%, transparent 55%),
+    radial-gradient(100% 80% at 92% 8%, var(--wash-2) 0%, transparent 52%),
+    radial-gradient(120% 100% at 60% 110%, var(--wash-3) 0%, transparent 58%),
+    linear-gradient(160deg, var(--canvas) 0%, var(--canvas-2) 50%, var(--canvas-3) 100%);
 }
 
 /* ── Toolbar ──────────────────────────────────────────────────── */
@@ -180,8 +187,11 @@
 .rail {
   width: 148px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-secondary);
+  /* panel 玻璃（D-158 §1）：缩略图栏浮在柔光上 */
+  background: linear-gradient(180deg, var(--glass-panel-a) 0%, var(--glass-panel-b) 100%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), inset -1px 0 0 0 var(--glass-hairline);
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 0;
@@ -193,7 +203,8 @@
   font-weight: 600;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  /* 玻璃面板上文字至少 secondary（verify-glass 抽屉文字审计的红线） */
+  color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 
@@ -408,8 +419,11 @@
   padding: 5px 8px;
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* float 玻璃：压在页面内容上，alpha ≥ .90（D-158 §1） */
+  background: linear-gradient(180deg, var(--glass-float-a) 0%, var(--glass-float-b) 100%);
+  backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), var(--glass-shadow-pill);
 }
 
 .redactbar-count {
@@ -671,20 +685,25 @@
   font-variant-numeric: tabular-nums;
   height: var(--statusbar-h);
   padding: 0 14px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-secondary);
+  flex-shrink: 0;
+  /* chrome 玻璃，与顶栏/工具条同材质；顶缝用 seam 收口 */
+  background: linear-gradient(180deg, var(--glass-chrome-a) 0%, var(--glass-chrome-b) 100%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), inset 0 1px 0 var(--glass-seam);
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--text-tertiary);
-  flex-shrink: 0;
 }
 
 /* ── Modal ────────────────────────────────────────────────────── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(6px);
+  /* 模态遮罩（D-158）：scrim 两档之一 + 25px blur，压暗即为「看这里」 */
+  background: var(--scrim);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -696,10 +715,12 @@
   max-height: 82vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  /* panel 玻璃 + 遮罩托底（D-158 §1/§6）：模态是玻璃最稳的落点 */
+  background: linear-gradient(180deg, var(--glass-panel-a) 0%, var(--glass-panel-b) 100%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), 0 12px 40px rgba(0, 0, 0, 0.38);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
 
@@ -811,20 +832,20 @@
   transform: translateX(-50%);
   padding: 9px 16px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: var(--on-accent);
+  /* float 玻璃（D-158 §1）：无遮罩托底，alpha ≥ .90 是硬约束 */
+  background: linear-gradient(180deg, var(--glass-float-a) 0%, var(--glass-float-b) 100%);
+  backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), var(--glass-shadow-pill);
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   z-index: 100;
 }
 
 /* Errors stay neutral by default; the red is a single 6px dot, not the whole
    surface — large red blocks read as "undoable destruction" in review. */
 .toast.error {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-hover);
-  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1081,11 +1102,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 52px;
+  height: var(--toolbar-h, 52px);
   padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
   flex: none;
+  /* chrome 玻璃（D-158 §1）：背后是 .app 的柔光渐变，blur+saturate 透出颜色 */
+  background: linear-gradient(180deg, var(--glass-chrome-a) 0%, var(--glass-chrome-b) 100%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), inset 0 1px 0 var(--glass-top-sheen),
+    inset 0 -1px 0 var(--glass-seam);
 }
 
 /* 产品名后的一句话自述（家族口径：3 秒内说出这软件干什么） */
@@ -1134,12 +1159,15 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   min-height: 44px;
   padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
   flex: none;
+  /* chrome 玻璃，与 .topbar 同材质同缝（D-158 §1） */
+  background: linear-gradient(180deg, var(--glass-chrome-a) 0%, var(--glass-chrome-b) 100%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: inset 0 0 0 0.5px var(--glass-hairline), inset 0 -1px 0 var(--glass-seam);
 }
 
 .tool {
