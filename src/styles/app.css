@@ -130,12 +130,6 @@
   padding: 0;
 }
 
-.lang-toggle {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
 .btn-danger {
   border-color: var(--danger);
   color: var(--danger);
@@ -1135,23 +1129,6 @@
 }
 
 /* 语言选择：原生 select，与相邻按钮同一视觉语言 */
-.lang-select {
-  height: 26px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  flex: none;
-}
-
-.lang-select:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
 /* ── 工具条 ── */
 .toolstrip {
   display: flex;

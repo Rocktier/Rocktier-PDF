@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LOCALES, useI18n, useT, type Lang } from '../i18n';
+import { useI18n, useT } from '../i18n';
 import type { AnnotTool, DocumentInfo } from '../types';
 import {
   IconCompress,
@@ -223,20 +223,22 @@ export function Toolbar({
           )}
         </button>
 
-        {/* 原生 select：选项少、键盘与读屏器免费获得，跨平台行为一致。 */}
-        <select
-          className="lang-select"
-          value={lang}
-          onChange={(e) => setLang(e.target.value as Lang)}
+        {/* 语言切换收成 A+地球图标按钮（2026-11-15 用户令）：en/zh 对切，
+            与主题按钮同款交互。 */}
+        <button
+          className="icon-btn"
+          onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
           title={t('toolbar.language')}
           aria-label={t('toolbar.language')}
         >
-          {LOCALES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.endonym}
-            </option>
-          ))}
-        </select>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 16 9 5l5 11" />
+            <path d="M6 12h6" />
+            <circle cx="16.5" cy="16.5" r="4.5" />
+            <ellipse cx="16.5" cy="16.5" rx="2" ry="4.5" />
+            <path d="M12.2 16.5h8.6" />
+          </svg>
+        </button>
       </header>
 
       <div className="toolstrip" role="toolbar" aria-label={t('toolbar.toolsLabel')}>
