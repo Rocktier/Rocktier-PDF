@@ -4,6 +4,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { LanguageProvider } from './i18n';
 
 import './styles/tokens.css';
+import './styles/glass.css';
 import './styles/global.css';
 import './styles/app.css';
 
