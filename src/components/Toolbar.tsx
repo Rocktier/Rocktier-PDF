@@ -12,7 +12,6 @@ import {
   IconMarkdown,
   IconMerge,
   IconMinus,
-  IconMoon,
   IconMore,
   IconNote,
   IconOpen,
@@ -210,8 +209,9 @@ export function Toolbar({
           </button>
         )}
 
-        {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），两态 light ⇄ dark，
-            图标只做太阳 / 月亮（2026-11-15 用户令：取消「跟随系统」）。 */}
+        {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），两态 light ⇄ dark。
+            2026-11-15 二次简化：固定一枚太阳，颜色随主题走（currentColor），
+            当前档位由角标 + title/aria 说明。 */}
         <button
           className="icon-btn"
           data-mode={theme}
@@ -219,15 +219,11 @@ export function Toolbar({
           title={`${t('toolbar.theme')} · ${t(`theme.mode.${theme}`)}`}
           aria-label={`${t('toolbar.theme')}: ${t(`theme.mode.${theme}`)}`}
         >
-          {theme === 'dark' ? (
-            <IconSun />
-          ) : (
-            <IconMoon />
-          )}
+          <IconSun />
         </button>
 
-        {/* 语言切换收成 A+地球图标按钮（2026-11-15 用户令）：en/zh 对切，
-            与主题按钮同款交互。 */}
+        {/* 语言切换：固定一枚地球（2026-11-15 用户令：去掉 A，只留地球），
+            en/zh 对切，与主题按钮同款交互。 */}
         <button
           className="icon-btn"
           onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
@@ -235,11 +231,9 @@ export function Toolbar({
           aria-label={t('toolbar.language')}
         >
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3.5 16.5 8.8 4.5l5.3 12" />
-            <path d="M5.5 11.5h6.6" />
-            <circle cx="16.8" cy="16.8" r="5.2" />
-            <ellipse cx="16.8" cy="16.8" rx="2.3" ry="5.2" />
-            <path d="M11.9 16.8h9.8" />
+            <circle cx="12" cy="12" r="9" />
+            <ellipse cx="12" cy="12" rx="3.8" ry="9" />
+            <path d="M3 12h18" />
           </svg>
         </button>
       </header>
