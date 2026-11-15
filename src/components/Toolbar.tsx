@@ -36,7 +36,7 @@ interface ToolbarProps {
   doc: DocumentInfo | null;
   busy: boolean;
   zoom: number;
-  theme: 'auto' | 'light' | 'dark';
+  theme: 'light' | 'dark';
   markupTool: AnnotTool | null;
   onMarkupTool: (tool: AnnotTool | null) => void;
   redactActive: boolean;
@@ -207,7 +207,8 @@ export function Toolbar({
           </button>
         )}
 
-        {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），三态靠 data-mode。 */}
+        {/* 家族唯一主题按钮：.icon-btn（28×28 + 40px 命中区），两态 light ⇄ dark，
+            图标只做太阳 / 月亮（2026-11-15 用户令：取消「跟随系统」）。 */}
         <button
           className="icon-btn"
           data-mode={theme}
@@ -215,22 +216,7 @@ export function Toolbar({
           title={`${t('toolbar.theme')} · ${t(`theme.mode.${theme}`)}`}
           aria-label={`${t('toolbar.theme')}: ${t(`theme.mode.${theme}`)}`}
         >
-          {theme === 'auto' ? (
-            <svg
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="2.5" y="4" width="19" height="13" rx="2" />
-              <path d="M8 20.5h8M12 17v3.5" />
-            </svg>
-          ) : theme === 'dark' ? (
+          {theme === 'dark' ? (
             <IconSun />
           ) : (
             <IconMoon />

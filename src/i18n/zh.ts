@@ -35,10 +35,9 @@ export const zh: Strings = {
     more: '更多',
   },
 
-  // 主题按钮三态文案（家族 §6.5）
+  // 主题按钮两态文案（2026-11-15 取消「跟随系统」）
   theme: {
     mode: {
-      auto: '跟随系统',
       light: '浅色',
       dark: '深色',
     },

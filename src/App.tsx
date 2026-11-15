@@ -58,8 +58,8 @@ import { UpdateDialog } from './components/UpdateDialog';
 /** 打包时写死，与 tag 同源 —— 不会出现系统里装着新版本而代码里写着旧版本的错位。 */
 const APP_VERSION = currentVersion();
 
-/** 三态：auto 跟随系统 → light → dark → auto（家族 §6.5 唯一状态机）。 */
-type Theme = 'auto' | 'light' | 'dark';
+/** 两态：light ⇄ dark（2026-11-15 用户令：全家族取消「跟随系统」，图标只做太阳/月亮）。 */
+type Theme = 'light' | 'dark';
 type Resolved = 'light' | 'dark';
 type Dialog =
   | 'merge'
@@ -78,7 +78,6 @@ type Dialog =
    仍回落旧键 —— 否则老用户升级后主题被静默重置成默认值。旧键不删。 */
 const THEME_KEY = 'rocktier.theme';
 const THEME_KEY_LEGACY = 'rocktier-pdf-editor.theme';
-const THEME_CYCLE: readonly Theme[] = ['auto', 'light', 'dark'];
 
 /* 打开请求的兜底时限（毫秒）。pdfium 打开一份文档实测在秒级以内，超过这个时长
    还不返回，就是后端 IPC 挂住了 —— 挂住时 busy 永远为真：状态栏的「处理中」不再
@@ -218,7 +217,7 @@ export function App() {
   >(null);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = resolveTheme(theme);
+    document.documentElement.dataset.theme = theme;
     try {
       localStorage.setItem(THEME_KEY, theme);
     } catch {
@@ -226,19 +225,8 @@ export function App() {
     }
   }, [theme]);
 
-  // auto 态下系统外观变了要跟着变；light/dark 是用户明确选择，不动。
-  useEffect(() => {
-    if (theme !== 'auto') return;
-    const mq = window.matchMedia('(prefers-color-scheme: light)');
-    const onChange = () => {
-      document.documentElement.dataset.theme = systemTheme();
-    };
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, [theme]);
-
   const cycleTheme = useCallback(() => {
-    setTheme((prev) => THEME_CYCLE[(THEME_CYCLE.indexOf(prev) + 1) % THEME_CYCLE.length]);
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
   const notify = useCallback((text: string, error = false, sticky = false) => {
@@ -1292,24 +1280,28 @@ export function App() {
   );
 }
 
-/** 读存储。三态引入前这里只认 dark/light；老用户的值原样保留，不需要迁移。 */
+/** 读存储。旧存 auto（跟随系统）的按读取当时系统值一次性落定并持久化，此后不跟随；
+    从没选过的默认深色（2026-11-15 起取消「跟随系统」）。 */
 function readTheme(): Theme {
   try {
     const saved = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(THEME_KEY_LEGACY);
-    if (saved === 'dark' || saved === 'light' || saved === 'auto') return saved;
+    if (saved === 'dark' || saved === 'light') return saved;
+    if (saved === 'auto') {
+      const resolved = systemTheme();
+      try {
+        localStorage.setItem(THEME_KEY, resolved);
+      } catch {
+        /* ignore */
+      }
+      return resolved;
+    }
   } catch {
     /* ignore */
   }
-  // 从没手动选过：跟随系统（家族基线，OCR / Pic2WebP / Journal 同规则）。
-  return 'auto';
+  return 'dark';
 }
 
 function systemTheme(): Resolved {
   return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-
-/** auto 落成实际生效的 light/dark —— data-theme 只接受这两值。 */
-function resolveTheme(mode: Theme): Resolved {
-  return mode === 'auto' ? systemTheme() : mode;
 }
 

@@ -33,10 +33,9 @@ export const en = {
     more: 'More',
   },
 
-  // 主题按钮三态文案（家族 §6.5）。title = 「Theme · Follow system」
+  // 主题按钮两态文案（2026-11-15 取消「跟随系统」）。title = 「Theme · Light」
   theme: {
     mode: {
-      auto: 'Follow system',
       light: 'Light',
       dark: 'Dark',
     },
