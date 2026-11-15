@@ -110,6 +110,9 @@ export function usePdf() {
   const openPathWithResult = useCallback(
     async (path: string, password?: string) => {
       setBusy(true);
+      // 与 run() 同口径：入口先清掉上一次的错误 —— 否则成功打开新文档后，
+      // 状态栏还挂着上一次失败的红字（Recent 点击走的就是这条路径）。
+      setError(null);
       try {
         const info = await openDocument(path, password);
         applyDoc(info);

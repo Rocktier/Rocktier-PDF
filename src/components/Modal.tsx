@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { IconClose } from './Logo';
 
@@ -10,7 +10,11 @@ interface ModalProps {
 }
 
 export function Modal({ title, onClose, children, footer }: ModalProps) {
+  const boxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    // 打开时把焦点交给对话框本体：否则 activeElement 停在 BODY，
+    // 键盘用户要盲 Tab 从文档头摸进来（2026-10-25 审计实测）。
+    boxRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -21,7 +25,9 @@ export function Modal({ title, onClose, children, footer }: ModalProps) {
   return (
     <div className="overlay" onMouseDown={onClose} role="presentation">
       <div
+        ref={boxRef}
         className="modal"
+        tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

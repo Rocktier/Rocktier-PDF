@@ -883,6 +883,9 @@
   flex: none;
   margin-left: auto;
   padding: 2px 10px;
+  /* 11px 字 + 2px 上下内边距算出来只有 23px，差 1px 不到 WCAG 2.5.8 的 24px 线 */
+  min-height: 24px;
+  box-sizing: border-box;
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-pill);
   background: none;
