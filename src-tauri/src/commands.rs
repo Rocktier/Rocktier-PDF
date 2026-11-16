@@ -1038,6 +1038,22 @@ pub async fn images_to_pdf(
     crate::pdf::images_to_pdf(pdfium, &paths, &output_path)
 }
 
+/// Convert the open document into an image-only PDF (text layer removed) —
+/// 防复制篡改的外发副本。
+#[tauri::command]
+pub async fn pdf_to_image_pdf(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    output_path: String,
+    width: i32,
+) -> CmdResult<PathResult> {
+    ensure_write_allowed()?;
+    let pdfium = init_pdfium(&app)?;
+    let guard = state.doc.lock().map_err(|e| e.to_string())?;
+    let doc = guard.as_ref().ok_or_else(|| "No document is open".to_string())?;
+    crate::pdf::pdf_to_image_pdf(pdfium, &doc.document, &output_path, width)
+}
+
 /* ── AcroForm fields ─────────────────────────────────────────────── */
 
 #[tauri::command]

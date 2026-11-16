@@ -918,6 +918,36 @@ pub fn export_pages_as_long_png(
     Ok(PathResult { path: out, size })
 }
 
+/// 把整份 PDF 转成「纯图版」：逐页渲染为位图再拼回 PDF，文字层不保留——
+/// 用于防复制篡改的外发副本（阶段 182 对表确认的缺口）。
+/// 复用 render_page（与导出图片同渲染质量）与 images_to_pdf 的拼装逻辑：
+/// 页面先落临时 PNG，拼装完即删，不在磁盘留中间产物。
+pub fn pdf_to_image_pdf(
+    pdfium: &Pdfium,
+    doc: &PdfDocument,
+    output_path: &str,
+    width: Pixels,
+) -> Result<PathResult, String> {
+    let total = doc.pages().len() as i32;
+    if total == 0 {
+        return Err("No pages to convert".to_string());
+    }
+    let tmp = std::env::temp_dir().join(format!("rocktier-imageify-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).map_err(|e| format!("Cannot create temp folder: {e}"))?;
+    let mut paths: Vec<String> = Vec::with_capacity(total as usize);
+    for index in 0..total {
+        let page = render_page(doc, index, width)?;
+        let encoded = page.data_url.split(',').nth(1).unwrap_or("");
+        let bytes = BASE64.decode(encoded).map_err(|e| e.to_string())?;
+        let file = tmp.join(format!("page_{:04}.png", index + 1));
+        std::fs::write(&file, &bytes).map_err(|e| format!("Cannot write image: {e}"))?;
+        paths.push(file.to_string_lossy().to_string());
+    }
+    let result = images_to_pdf(pdfium, &paths, output_path);
+    let _ = std::fs::remove_dir_all(&tmp);
+    result
+}
+
 /// Builds a new PDF with one page per image (JPEG or PNG), each page sized to
 /// the image at 96 dpi so it lands at its natural printed size.
 pub fn images_to_pdf(

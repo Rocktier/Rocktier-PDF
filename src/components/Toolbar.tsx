@@ -49,6 +49,7 @@ interface ToolbarProps {
   onStamp: () => void;
   onExportImages: () => void;
   onExportLongImage: () => void;
+  onImageify: () => void;
   onImagesToPdf: () => void;
   onSign: () => void;
   /** 数字签名（密码学）—— 与上面那个图片印章是两回事。 */
@@ -93,6 +94,7 @@ export function Toolbar({
   onStamp,
   onExportImages,
   onExportLongImage,
+  onImageify,
   onImagesToPdf,
   onSign,
   onDigitalSign,
@@ -459,6 +461,15 @@ export function Toolbar({
               >
                 <IconLongImage />
                 {t('toolbar.exportLongImage')}
+              </button>
+              <button
+                className="menu-item"
+                role="menuitem"
+                onClick={pick(onImageify)}
+                disabled={!doc || busy}
+              >
+                <IconImagesToPdf />
+                {t('toolbar.imageify')}
               </button>
               <button
                 className="menu-item"

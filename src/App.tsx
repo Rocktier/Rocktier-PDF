@@ -32,6 +32,7 @@ import {
   exportPageImagesLong,
   fileStem,
   imagesToPdf,
+  pdfToImagePdf,
   initialFile,
   onMenuAction,
   onOpenFile,
@@ -763,6 +764,20 @@ export function App() {
     }
   }, [notify, t]);
 
+  // 转纯图 PDF：整本逐页渲染成位图再拼回 PDF，文字层不保留（防篡改外发副本）。
+  const runImageify = useCallback(async () => {
+    if (!pdf.doc) return;
+    const target = await pickSavePath(`${fileStem(pdf.doc.name)}-纯图.pdf`);
+    if (!target) return;
+    try {
+      const result = await pdfToImagePdf(target, 1600);
+      notify(t('toast.imagePdf', { name: fileStem(result.path) + '.pdf' }));
+      void revealInFinder(result.path);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e), true);
+    }
+  }, [notify, pdf, t]);
+
   const applyMarkup = useCallback(
     async (rect: MarkupRect) => {
       if (!markupTool || markupTool === 'note' || markupTool === 'sign' || markupTool === 'dsign') {
@@ -1036,6 +1051,7 @@ export function App() {
         onStamp={() => setDialog('stamp')}
         onExportImages={exportImages}
         onExportLongImage={exportLongImage}
+            onImageify={runImageify}
         onImagesToPdf={runImagesToPdf}
         onSign={chooseSignature}
         onDigitalSign={openSignDialog}

@@ -465,6 +465,7 @@ fn main() {
             commands::export_page_images,
             commands::export_page_images_long,
             commands::images_to_pdf,
+            commands::pdf_to_image_pdf,
             commands::pdf_to_markdown,
             commands::pdf_save_markdown,
             commands::add_markup,

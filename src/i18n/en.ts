@@ -18,6 +18,7 @@ export const en = {
     copyText: 'Copy text',
     exportImages: 'To images',
     exportLongImage: 'Long image',
+    imageify: 'Image-only PDF',
     imagesToPdf: 'Images to PDF',
     sign: 'Stamp',
     digitalSign: 'Digital signature',
@@ -340,6 +341,7 @@ export const en = {
     noText: 'No text on the selected pages',
     exported: 'Exported {count} image(s)',
     longImage: 'Long image saved — {name}',
+    imagePdf: 'Image-only PDF saved — {name}',
     imagesPdf: 'Created {name}',
     // 破折号而不是冒号：见 dsignReady 上面对 family-check 取键正则的说明。
     signed: 'Signed — {name}',

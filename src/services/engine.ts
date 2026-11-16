@@ -388,6 +388,11 @@ export async function imagesToPdf(paths: string[], outputPath: string): Promise<
   return invoke<PathResult>('images_to_pdf', { paths, outputPath });
 }
 
+/** Convert the open document into an image-only PDF (text layer removed). */
+export async function pdfToImagePdf(outputPath: string, width: number): Promise<PathResult> {
+  return invoke<PathResult>('pdf_to_image_pdf', { outputPath, width });
+}
+
 /* ── Native dialogs ─────────────────────────────────────────────── */
 
 export async function pickPdf(): Promise<string | null> {
