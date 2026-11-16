@@ -46,6 +46,10 @@ jobs:
           workspaces: src-tauri
           key: mas-universal
 
+      # Intel 池上 dtolnay action 的 targets 偶尔不生效（实测只装了 x86_64），显式补装
+      - name: Ensure Rust targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
       # PDF 的 build.rs 硬性要求 bundle.resources 里的三个 sidecar 都在
       # （qpdf / sign-engine / pdfium），缺任何一个 cargo 都会死在 build script。
       - name: Setup Go (sign-engine sidecar)
