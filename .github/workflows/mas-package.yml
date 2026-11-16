@@ -45,11 +45,28 @@ jobs:
           workspaces: src-tauri
           key: mas-universal
 
+      # PDF 的 build.rs 硬性要求 bundle.resources 里的三个 sidecar 都在
+      # （qpdf / sign-engine / pdfium），缺任何一个 cargo 都会死在 build script。
+      - name: Setup Go (sign-engine sidecar)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sign-engine/go.mod
+          cache-dependency-path: sign-engine/go.sum
+
+      - name: Install qpdf + provision the sidecar
+        run: |
+          brew install qpdf
+          bash scripts/provision-qpdf-macos.sh
+
+      - name: Provision sign-engine sidecar
+        run: bash scripts/provision-sign-engine-macos.sh
+
+      - name: Fetch Pdfium
+        run: node scripts/fetch-pdfium.mjs --all
+
       - name: Install npm dependencies
         run: npm install
 
-      # BUILD_NUM 进 CFBundleVersion。ASC 要求同一 version 下 build 号严格递增，
-      # 用 run_number 天然满足；重跑也一样增长，不会撞号。
       - name: Build store-channel .app
         env:
           BUILD_NUM: ${{ github.run_number }}
