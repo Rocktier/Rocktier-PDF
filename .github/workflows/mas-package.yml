@@ -20,7 +20,8 @@ concurrency:
 jobs:
   pack:
     name: Build store-channel universal .app
-    runs-on: macos-latest
+    # macos-latest（arm64）容量紧张且出现过运行中被回收的情况，改用 Intel 池
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
