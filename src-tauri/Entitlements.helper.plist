@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MAS 辅助可执行文件（sidecar）专用 entitlements。
+  主 .app 用 Entitlements.appstore.plist；这里是给 Resources/resources 下
+  qpdf、sign-engine 这类**被主程序 exec 的 CLI 工具**用的。
+
+  · com.apple.security.app-sandbox = true
+      每个可执行文件都必须带；不带时 ASC 上传报
+      "App sandbox not enabled ... qpdf, sign-engine-macos"（2026-11-17 实测）。
+  · com.apple.security.inherit = true
+      让 helper 沿用父进程（主 .app）的沙箱，否则它拿到一个空的沙箱，
+      读不到传进来的临时文件。该键只允许用于同一 App 内嵌的 helper。
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.inherit</key>
+    <true/>
+</dict>
+</plist>

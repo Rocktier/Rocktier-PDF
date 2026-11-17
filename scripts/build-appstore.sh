@@ -325,6 +325,20 @@ cmd_sign() {
         codesign --force --sign "$sign_id" "$nested"
     done
 
+    # sidecar 可执行文件（qpdf / sign-engine 等）也必须 Apple Distribution 签名，
+    # 且每个可执行文件都要带 sandbox entitlement。漏签时 codesign --verify 全绿，
+    # 只有 ASC 上传阶段报 "App sandbox not enabled"（2026-11-17 实测）。
+    local helper_ent="$SCRIPT_DIR/src-tauri/Entitlements.helper.plist"
+    [ -f "$helper_ent" ] || die "缺 sidecar entitlements 模板：${helper_ent}"
+    local exe
+    find "$app/Contents" -type f -perm -111 -not -path "$app/Contents/MacOS/*" -print 2>/dev/null \
+    | while IFS= read -r exe; do
+        if file "$exe" | grep -q "Mach-O"; then
+            say "签名 sidecar: ${exe#"$app/Contents/"}"
+            codesign --force --sign "$sign_id" --entitlements "$helper_ent" "$exe"
+        fi
+    done
+
     echo ""
     echo "🔏 签名 .app（不加 --options runtime / 不加 --timestamp）..."
     codesign --force --sign "$sign_id" --entitlements "$merged" "$app"
