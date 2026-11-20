@@ -928,7 +928,9 @@ pub fn pdf_to_image_pdf(
     output_path: &str,
     width: Pixels,
 ) -> Result<PathResult, String> {
-    let total = doc.pages().len() as i32;
+    // pdfium-render 的 pages().len() 本身就是 i32（早期版本才是 usize），
+    // 再 as i32 会被 clippy::unnecessary_cast 判成错误（CI 带 -D warnings）。
+    let total = doc.pages().len();
     if total == 0 {
         return Err("No pages to convert".to_string());
     }
